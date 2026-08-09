@@ -44,9 +44,10 @@ jobs:
           if len(selected) != 1:
               raise SystemExit(f"tag selects {len(selected)} images, expected exactly one")
           name, entry = selected[0]
-          version = tag.removeprefix(entry["tag_prefix"])
-          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", version):
-              raise SystemExit(f"invalid release version: {version}")
+          version_number = tag.removeprefix(entry["tag_prefix"])
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version_number):
+              raise SystemExit(f"invalid release version: {version_number}")
+          version = f"v{version_number}"
           config = json.loads(pathlib.Path(entry["config"]).read_text())
           if config["name"] != name:
               raise SystemExit("catalog and image configuration disagree")
