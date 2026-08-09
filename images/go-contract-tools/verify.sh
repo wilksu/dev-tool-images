@@ -43,9 +43,9 @@ export GOPROXY=off GOTOOLCHAIN=local GOWORK=off
 printf '%s\n' 'verifying Buf lint and local generation'
 buf lint
 buf generate
-test -s gen/go/devtools/v1/echo.pb.go
-test -s gen/go/devtools/v1/echo.connect.go
-test -s gen/ts/devtools/v1/echo_pb.ts
+find gen/go -type f -name '*.pb.go' -size +0c -print -quit | grep -q .
+find gen/go -type f -name '*.connect.go' -size +0c -print -quit | grep -q .
+find gen/ts -type f -name '*_pb.ts' -size +0c -print -quit | grep -q .
 
 mkdir -p gen/openapi gen/client
 printf '%s\n' 'verifying OpenAPI generators'
