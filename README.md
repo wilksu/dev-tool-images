@@ -76,10 +76,11 @@ BuildKit SBOM and max-mode provenance attestations, records GitHub build
 provenance, and verifies that the resulting manifest contains both required
 platforms. It never publishes `latest` and never writes back to the repository.
 
-The first publish of each GHCR package is a bootstrap operation. An administrator
-must link it to this public repository, change package visibility to public, and
-prove an anonymous digest pull. The workflow intentionally does not have or seek
-permission to change package visibility.
+The first publish of each GHCR package is a bootstrap operation. The OCI source
+label links the package to this public repository, and the release must prove an
+anonymous manifest read after publishing. If a package does not inherit public
+visibility, an administrator must correct that through the package settings; the
+workflow intentionally does not have or seek permission to change visibility.
 
 ## Supply-chain boundary
 
