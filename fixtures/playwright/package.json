@@ -1,0 +1,9 @@
+{
+  "name": "playwright-client-tools-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "test:list": "playwright test --list",
+    "typecheck": "tsc --noEmit"
+  }
+}

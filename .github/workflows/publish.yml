@@ -1,0 +1,138 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - go-contract-tools/v[0-9]*.[0-9]*.[0-9]*
+      - playwright-client-tools/v[0-9]*.[0-9]*.[0-9]*
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish immutable multi-platform image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: release
+        name: Resolve tag through the public catalog
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+
+          catalog = json.loads(pathlib.Path("catalog/v1/images.json").read_text())
+          tag = os.environ["RELEASE_TAG"]
+          selected = [
+              (name, entry)
+              for name, entry in catalog["images"].items()
+              if tag.startswith(entry["tag_prefix"])
+          ]
+          if len(selected) != 1:
+              raise SystemExit(f"tag selects {len(selected)} images, expected exactly one")
+          name, entry = selected[0]
+          version = tag.removeprefix(entry["tag_prefix"])
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"invalid release version: {version}")
+          config = json.loads(pathlib.Path(entry["config"]).read_text())
+          if config["name"] != name:
+              raise SystemExit("catalog and image configuration disagree")
+          if config["platforms"] != ["linux/amd64", "linux/arm64"]:
+              raise SystemExit("release platform contract is not the required pair")
+          arguments = []
+          for section in ("base_images", "tools", "packages"):
+              arguments.extend(
+                  f"{key.upper()}={value}"
+                  for key, value in config.get(section, {}).items()
+              )
+          arguments.extend([
+              f"IMAGE_VERSION={version}",
+              f"SOURCE_REVISION={os.environ['GITHUB_SHA']}",
+          ])
+          outputs = {
+              "image_name": name,
+              "image": entry["registry"],
+              "version": version,
+              "context": str(pathlib.Path(entry["config"]).parent),
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              for key, value in outputs.items():
+                  output.write(f"{key}={value}\n")
+              output.write("build_args<<BUILD_ARGS\n")
+              output.write("\n".join(arguments))
+              output.write("\nBUILD_ARGS\n")
+          PY
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: metadata
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ steps.release.outputs.image }}
+          tags: |
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=sha,format=long,prefix=sha-
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            io.starferry.tool.name=${{ steps.release.outputs.image_name }}
+      - id: build
+        name: Build and publish multi-platform image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: ${{ steps.release.outputs.context }}
+          file: ${{ steps.release.outputs.context }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: ${{ steps.release.outputs.build_args }}
+          cache-from: type=gha,scope=${{ steps.release.outputs.image_name }}-publish
+          cache-to: type=gha,mode=max,scope=${{ steps.release.outputs.image_name }}-publish
+          provenance: mode=max
+          sbom: true
+      - name: Record GitHub build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ${{ steps.release.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Verify the published manifest contract
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ steps.release.outputs.image }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" --raw > "$RUNNER_TEMP/manifest.json"
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          manifest = json.loads(pathlib.Path(os.environ["RUNNER_TEMP"], "manifest.json").read_text())
+          platforms = {
+              (item.get("platform") or {}).get("os", "") + "/" +
+              (item.get("platform") or {}).get("architecture", "")
+              for item in manifest.get("manifests", [])
+          }
+          required = {"linux/amd64", "linux/arm64"}
+          if not required.issubset(platforms):
+              raise SystemExit(f"published manifest is missing platforms: {required - platforms}")
+          PY

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "source_repository": "wilksu/dev-tool-images",
+  "images": {
+    "go-contract-tools": {
+      "registry": "ghcr.io/wilksu/dev-tool-images/go-contract-tools",
+      "config": "images/go-contract-tools/image.json",
+      "tag_prefix": "go-contract-tools/v"
+    },
+    "playwright-client-tools": {
+      "registry": "ghcr.io/wilksu/dev-tool-images/playwright-client-tools",
+      "config": "images/playwright-client-tools/image.json",
+      "tag_prefix": "playwright-client-tools/v"
+    }
+  }
+}
