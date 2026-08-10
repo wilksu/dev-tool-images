@@ -12,6 +12,8 @@
   "tools": {
     "go_version": "1.26.4",
     "node_version": "24.18.0",
+    "protoc_version": "29.3",
+    "grpc_python_plugin_version": "1.68.0",
     "buf_version": "v1.66.1",
     "golangci_version": "v2.12.0",
     "protoc_gen_go_version": "v1.36.11",
@@ -20,6 +22,13 @@
     "protoc_gen_doc_version": "v1.5.1",
     "oapi_codegen_version": "v2.6.0",
     "goimports_version": "v0.30.0"
+  },
+  "sources": {
+    "grpc_python_plugin_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e"
+  },
+  "artifacts": {
+    "protoc_linux_amd64_sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
+    "protoc_linux_arm64_sha256": "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32"
   },
   "packages": {
     "alpine_bash_version": "5.3.9-r1",
@@ -52,6 +61,45 @@
         "version_key": "tools.node_version",
         "source": "https://github.com/nodejs/node",
         "executables": ["node", "npm", "npx"]
+      },
+      {
+        "id": "protoc",
+        "kind": "release-binary",
+        "package": "protocolbuffers/protobuf",
+        "version": "29.3",
+        "version_key": "tools.protoc_version",
+        "source": "https://github.com/protocolbuffers/protobuf",
+        "executables": ["protoc"],
+        "buf_plugins": [
+          "buf.build/protocolbuffers/python:v29.3",
+          "buf.build/protocolbuffers/pyi:v29.3"
+        ],
+        "artifacts": [
+          {
+            "platform": "linux/amd64",
+            "url": "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip",
+            "sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
+            "sha256_key": "artifacts.protoc_linux_amd64_sha256"
+          },
+          {
+            "platform": "linux/arm64",
+            "url": "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-aarch_64.zip",
+            "sha256": "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32",
+            "sha256_key": "artifacts.protoc_linux_arm64_sha256"
+          }
+        ]
+      },
+      {
+        "id": "grpc-python-plugin",
+        "kind": "source-build",
+        "package": "grpc/grpc",
+        "version": "1.68.0",
+        "version_key": "tools.grpc_python_plugin_version",
+        "source": "https://github.com/grpc/grpc",
+        "source_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e",
+        "source_revision_key": "sources.grpc_python_plugin_revision",
+        "executables": ["protoc-gen-grpc_python"],
+        "buf_plugins": ["buf.build/grpc/python:v1.68.0"]
       },
       {
         "id": "buf",

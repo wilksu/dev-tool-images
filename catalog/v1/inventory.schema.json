@@ -48,7 +48,9 @@
             "runtime",
             "go-module",
             "npm-package",
-            "alpine-package"
+            "alpine-package",
+            "release-binary",
+            "source-build"
           ]
         },
         "package": {
@@ -85,6 +87,30 @@
           "items": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "buf_plugins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^buf\\.build/[a-z0-9._-]+/[a-z0-9._-]+:v[0-9]+(\\.[0-9]+)+([-+][0-9A-Za-z.-]+)?$"
+          }
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_revision_key": {
+          "type": "string",
+          "pattern": "^sources\\.[a-z0-9_]+$"
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifact"
           }
         }
       },
@@ -125,8 +151,60 @@
           "then": {
             "required": ["version_key"]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "release-binary"
+              }
+            }
+          },
+          "then": {
+            "required": ["version_key", "executables", "artifacts"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "source-build"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "version_key",
+              "executables",
+              "source_revision",
+              "source_revision_key"
+            ]
+          }
         }
       ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["platform", "url", "sha256", "sha256_key"],
+      "properties": {
+        "platform": {
+          "enum": ["linux/amd64", "linux/arm64"]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sha256_key": {
+          "type": "string",
+          "pattern": "^artifacts\\.[a-z0-9_]+$"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

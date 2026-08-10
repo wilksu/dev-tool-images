@@ -8,7 +8,7 @@ consumers accept immutable OCI digests instead of rebuilding these toolchains.
 
 | Logical name | Purpose | Browser binaries |
 | --- | --- | --- |
-| `go-contract-tools` | Go, Buf, Proto, OpenAPI, and TypeScript contract generation and quality tools | N/A |
+| `go-contract-tools` | Go, Buf, Protobuf/Python gRPC, OpenAPI, and TypeScript contract generation and quality tools | N/A |
 | `playwright-client-tools` | Playwright client, Node types, and TypeScript for browserless test discovery and execution | No |
 
 The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json),
@@ -17,8 +17,10 @@ which also publishes the inventory pointers and their
 Each catalog entry points to a schema-2 `image.json` that owns base-image and
 build versions, supported platforms, capabilities, npm lock location, verifier,
 and a normalized `inventory.components` array. Every directly selected runtime,
-Go module, npm package, and Alpine package has a machine-readable component ID,
-kind, package name, exact version, and upstream source. README prose and
+Go module, npm package, Alpine package, release binary, and source-built tool
+has a machine-readable component ID, kind, package name, exact version, and
+upstream source. Release binaries also expose per-platform URLs and checksums;
+source-built tools expose the exact upstream revision. README prose and
 `THIRD_PARTY.md` are human projections, not machine interfaces.
 
 For example, consumers and update automation can enumerate the Contract tools
@@ -72,7 +74,8 @@ make verify IMAGE=playwright-client-tools
 Verification runs without network access, with a read-only root filesystem,
 without Linux capabilities, and with `no-new-privileges`. The contract fixture
 exercises Buf lint/generation, Go and Connect generators, the ES generator,
-both OpenAPI generators, Go build/vet/lint, and TypeScript. The Playwright
+protoc Python/typing generation, the gRPC Python generator, both OpenAPI
+generators, Go build/vet/lint, and TypeScript. The Playwright
 fixture proves client loading, type checking, and test discovery without
 installing or launching a browser.
 
