@@ -71,10 +71,11 @@ RUN set -eu; \
       -S /tmp/grpc-python-plugin \
       -B /tmp/grpc-python-plugin/build \
       -DGRPC_SOURCE_DIR=/tmp/grpc \
-      -DCMAKE_BUILD_TYPE=Release; \
+      -DCMAKE_BUILD_TYPE=Release \
+      '-DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG'; \
     cmake --build /tmp/grpc-python-plugin/build \
       --target protoc-gen-grpc_python \
-      --parallel; \
+      --parallel 2; \
     cp /tmp/grpc-python-plugin/build/protoc-gen-grpc_python \
       /usr/local/bin/protoc-gen-grpc_python
 
