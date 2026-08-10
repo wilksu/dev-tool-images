@@ -121,6 +121,17 @@ def validate_image(name: str, entry: dict) -> None:
             assert component["source_revision"] == config[section][key]
             claimed_source_keys.add(source_revision_key)
 
+        for dependency in component.get("build_dependencies", []):
+            assert COMPONENT_VERSION.fullmatch(dependency["version"]), dependency
+            assert dependency["source"].startswith("https://")
+            assert SOURCE_REVISION.fullmatch(dependency["source_revision"])
+            dependency_key = dependency["source_revision_key"]
+            assert dependency_key in configured_source_keys
+            assert dependency_key not in claimed_source_keys
+            section, key = dependency_key.split(".", 1)
+            assert dependency["source_revision"] == config[section][key]
+            claimed_source_keys.add(dependency_key)
+
         artifact_platforms: set[str] = set()
         for artifact in component.get("artifacts", []):
             assert artifact["platform"] in REQUIRED_PLATFORMS
@@ -210,6 +221,9 @@ def validate_image(name: str, entry: dict) -> None:
         verifier_text = verifier.read_text(encoding="utf-8")
         for output in ("echo_pb2.py", "echo_pb2.pyi", "echo_pb2_grpc.py"):
             assert output in verifier_text
+        cmake = image_dir / "grpc-python-plugin.CMakeLists.txt"
+        assert cmake.is_file()
+        assert "protobuf::libprotoc" in cmake.read_text(encoding="utf-8")
 
 
 def validate_workflows() -> None:

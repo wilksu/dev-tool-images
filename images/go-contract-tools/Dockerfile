@@ -48,10 +48,13 @@ FROM ${NODE_BASE_IMAGE} AS grpc-python-tools
 
 ARG GRPC_PYTHON_PLUGIN_VERSION
 ARG GRPC_PYTHON_PLUGIN_REVISION
+ARG GRPC_PYTHON_PLUGIN_PROTOBUF_REVISION
 RUN apk add --no-cache \
+      "cmake=4.2.3-r0" \
       "g++=15.2.0-r5" \
       "git=2.54.0-r0" \
-      "protobuf-dev=31.1-r1"
+      "make=4.4.1-r4"
+COPY grpc-python-plugin.CMakeLists.txt /tmp/grpc-python-plugin/CMakeLists.txt
 RUN set -eu; \
     git init /tmp/grpc; \
     cd /tmp/grpc; \
@@ -60,12 +63,19 @@ RUN set -eu; \
     git checkout --detach FETCH_HEAD; \
     test "$(git rev-parse HEAD)" = "${GRPC_PYTHON_PLUGIN_REVISION}"; \
     grep -Fx "VERSION = '${GRPC_PYTHON_PLUGIN_VERSION}'" src/python/grpcio/grpc_version.py; \
-    g++ -std=c++17 -O2 -s -static -I. -Iinclude \
-      src/compiler/python_plugin.cc \
-      src/compiler/python_generator.cc \
-      src/compiler/proto_parser_helper.cc \
-      -lprotoc $(pkg-config --static --libs protobuf) -pthread \
-      -o /usr/local/bin/protoc-gen-grpc_python
+    git submodule update --init --depth 1 third_party/protobuf; \
+    test "$(git -C third_party/protobuf rev-parse HEAD)" = "${GRPC_PYTHON_PLUGIN_PROTOBUF_REVISION}"; \
+    git -C third_party/protobuf submodule update --init --depth 1 third_party/abseil-cpp; \
+    cmake \
+      -S /tmp/grpc-python-plugin \
+      -B /tmp/grpc-python-plugin/build \
+      -DGRPC_SOURCE_DIR=/tmp/grpc \
+      -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build /tmp/grpc-python-plugin/build \
+      --target protoc-gen-grpc_python \
+      --parallel; \
+    cp /tmp/grpc-python-plugin/build/protoc-gen-grpc_python \
+      /usr/local/bin/protoc-gen-grpc_python
 
 FROM ${NODE_BASE_IMAGE}
 

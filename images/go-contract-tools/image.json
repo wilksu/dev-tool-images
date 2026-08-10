@@ -24,7 +24,8 @@
     "goimports_version": "v0.30.0"
   },
   "sources": {
-    "grpc_python_plugin_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e"
+    "grpc_python_plugin_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e",
+    "grpc_python_plugin_protobuf_revision": "10ef3f77683f77fb3c059bf47725c27b3ff41e63"
   },
   "artifacts": {
     "protoc_linux_amd64_sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
@@ -99,7 +100,16 @@
         "source_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e",
         "source_revision_key": "sources.grpc_python_plugin_revision",
         "executables": ["protoc-gen-grpc_python"],
-        "buf_plugins": ["buf.build/grpc/python:v1.68.0"]
+        "buf_plugins": ["buf.build/grpc/python:v1.68.0"],
+        "build_dependencies": [
+          {
+            "package": "protocolbuffers/protobuf",
+            "version": "28.1",
+            "source": "https://github.com/protocolbuffers/protobuf",
+            "source_revision": "10ef3f77683f77fb3c059bf47725c27b3ff41e63",
+            "source_revision_key": "sources.grpc_python_plugin_protobuf_revision"
+          }
+        ]
       },
       {
         "id": "buf",
