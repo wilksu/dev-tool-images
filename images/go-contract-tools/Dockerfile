@@ -53,6 +53,7 @@ RUN apk add --no-cache \
       "cmake=4.2.3-r0" \
       "g++=15.2.0-r5" \
       "git=2.54.0-r0" \
+      "linux-headers=7.0.0-r1" \
       "make=4.4.1-r4"
 COPY grpc-python-plugin.CMakeLists.txt /tmp/grpc-python-plugin/CMakeLists.txt
 RUN set -eu; \
