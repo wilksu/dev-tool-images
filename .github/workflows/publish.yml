@@ -23,7 +23,7 @@ jobs:
   publish:
     name: Publish immutable revision image
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - id: release
@@ -57,7 +57,10 @@ jobs:
             io.starferry.tool.name=${{ steps.release.outputs.image_name }}
             io.starferry.tool.inventory-path=${{ steps.release.outputs.inventory_path }}
           build-args: ${{ steps.release.outputs.build_args }}
-          cache-from: type=gha,scope=${{ steps.release.outputs.image_name }}-publish
+          cache-from: |
+            type=gha,scope=${{ steps.release.outputs.image_name }}-publish
+            type=gha,scope=${{ steps.release.outputs.image_name }}-amd64
+            type=gha,scope=${{ steps.release.outputs.image_name }}-arm64
           cache-to: type=gha,mode=max,scope=${{ steps.release.outputs.image_name }}-publish
           provenance: mode=max
           sbom: true
