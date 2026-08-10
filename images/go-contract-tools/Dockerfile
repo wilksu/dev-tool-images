@@ -60,7 +60,7 @@ RUN set -eu; \
     git checkout --detach FETCH_HEAD; \
     test "$(git rev-parse HEAD)" = "${GRPC_PYTHON_PLUGIN_REVISION}"; \
     grep -Fx "VERSION = '${GRPC_PYTHON_PLUGIN_VERSION}'" src/python/grpcio/grpc_version.py; \
-    g++ -std=c++17 -O2 -s -static -I. \
+    g++ -std=c++17 -O2 -s -static -I. -Iinclude \
       src/compiler/python_plugin.cc \
       src/compiler/python_generator.cc \
       src/compiler/proto_parser_helper.cc \
