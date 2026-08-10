@@ -20,6 +20,19 @@ BUILDKIT_IMAGE = (
 DIGEST_REFERENCE = re.compile(r"@sha256:[0-9a-f]{64}$")
 ACTION_COMMIT = re.compile(r"[0-9a-f]{40}")
 COMPONENT_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+(?:[-+][0-9A-Za-z.-]+)?$")
+SOURCE_REVISION = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+BUF_PLUGIN = re.compile(
+    r"^buf\.build/[a-z0-9._-]+/[a-z0-9._-]+:v"
+    r"[0-9]+(?:\.[0-9]+)+(?:[-+][0-9A-Za-z.-]+)?$"
+)
+BUILD_ARGUMENT_SECTIONS = (
+    "base_images",
+    "tools",
+    "packages",
+    "sources",
+    "artifacts",
+)
 
 
 def read_json(path: pathlib.Path) -> dict:
@@ -58,19 +71,39 @@ def validate_image(name: str, entry: dict) -> None:
         for section in ("tools", "packages")
         for key in config.get(section, {})
     }
+    configured_source_keys = {
+        f"sources.{key}" for key in config.get("sources", {})
+    }
+    configured_artifact_keys = {
+        f"artifacts.{key}" for key in config.get("artifacts", {})
+    }
     claimed_keys: set[str] = set()
+    claimed_source_keys: set[str] = set()
+    claimed_artifact_keys: set[str] = set()
+    claimed_buf_plugins: set[str] = set()
     npm_inventory: dict[str, tuple[str, str]] = {}
     alpine_inventory: dict[str, str] = {}
     go_install_inventory: dict[str, str] = {}
 
     for component in components:
         assert set(component) >= {"id", "kind", "package", "version", "source"}
-        assert component["kind"] in {"runtime", "go-module", "npm-package", "alpine-package"}
+        assert component["kind"] in {
+            "runtime",
+            "go-module",
+            "npm-package",
+            "alpine-package",
+            "release-binary",
+            "source-build",
+        }
         assert COMPONENT_VERSION.fullmatch(component["version"]), component
         assert component["source"].startswith("https://")
         if "executables" in component:
             assert component["executables"]
             assert len(set(component["executables"])) == len(component["executables"])
+        for plugin in component.get("buf_plugins", []):
+            assert BUF_PLUGIN.fullmatch(plugin), component
+            assert plugin not in claimed_buf_plugins, plugin
+            claimed_buf_plugins.add(plugin)
 
         version_key = component.get("version_key")
         if version_key:
@@ -78,6 +111,44 @@ def validate_image(name: str, entry: dict) -> None:
             assert version_key not in claimed_keys
             assert component["version"] == resolve_version(config, version_key)
             claimed_keys.add(version_key)
+
+        source_revision_key = component.get("source_revision_key")
+        if source_revision_key:
+            assert source_revision_key in configured_source_keys
+            assert source_revision_key not in claimed_source_keys
+            assert SOURCE_REVISION.fullmatch(component["source_revision"])
+            section, key = source_revision_key.split(".", 1)
+            assert component["source_revision"] == config[section][key]
+            claimed_source_keys.add(source_revision_key)
+
+        for dependency in component.get("build_dependencies", []):
+            assert COMPONENT_VERSION.fullmatch(dependency["version"]), dependency
+            assert dependency["source"].startswith("https://")
+            assert SOURCE_REVISION.fullmatch(dependency["source_revision"])
+            dependency_key = dependency["source_revision_key"]
+            assert dependency_key in configured_source_keys
+            assert dependency_key not in claimed_source_keys
+            section, key = dependency_key.split(".", 1)
+            assert dependency["source_revision"] == config[section][key]
+            claimed_source_keys.add(dependency_key)
+
+        artifact_platforms: set[str] = set()
+        for artifact in component.get("artifacts", []):
+            assert artifact["platform"] in REQUIRED_PLATFORMS
+            assert artifact["platform"] not in artifact_platforms
+            artifact_platforms.add(artifact["platform"])
+            assert artifact["url"].startswith("https://")
+            assert SHA256.fullmatch(artifact["sha256"])
+            sha256_key = artifact["sha256_key"]
+            assert sha256_key in configured_artifact_keys
+            assert sha256_key not in claimed_artifact_keys
+            section, key = sha256_key.split(".", 1)
+            assert artifact["sha256"] == config[section][key]
+            claimed_artifact_keys.add(sha256_key)
+        if component["kind"] == "release-binary":
+            assert artifact_platforms == set(REQUIRED_PLATFORMS)
+        if component["kind"] == "source-build":
+            assert source_revision_key
 
         if component["kind"] == "npm-package":
             manifest = component.get("manifest", "")
@@ -93,6 +164,8 @@ def validate_image(name: str, entry: dict) -> None:
             alpine_inventory[component["package"]] = component["version"]
 
     assert claimed_keys == configured_keys
+    assert claimed_source_keys == configured_source_keys
+    assert claimed_artifact_keys == configured_artifact_keys
 
     image_dir = config_path.parent
     package = read_json(image_dir / "package.json")
@@ -107,7 +180,7 @@ def validate_image(name: str, entry: dict) -> None:
     dockerfile = (image_dir / "Dockerfile").read_text(encoding="utf-8")
     assert "org.opencontainers.image.version" not in dockerfile
     assert "IMAGE_VERSION" not in dockerfile
-    for section in ("base_images", "tools", "packages"):
+    for section in BUILD_ARGUMENT_SECTIONS:
         for key in config.get(section, {}):
             assert re.search(rf"^ARG {re.escape(key.upper())}(?:=|$)", dockerfile, re.MULTILINE)
     expected_apk_entries = set()
@@ -119,7 +192,7 @@ def validate_image(name: str, entry: dict) -> None:
         )
         expected_apk_entries.add(f'"{package_name}=${{{key.upper()}}}"')
     if expected_apk_entries:
-        apk_block = dockerfile.split("RUN apk add --no-cache \\\n", 1)[1].split("\n\n", 1)[0]
+        apk_block = dockerfile.rsplit("RUN apk add --no-cache \\\n", 1)[1].split("\n\n", 1)[0]
         apk_entries = {
             line.strip().removesuffix("\\").strip()
             for line in apk_block.splitlines()
@@ -134,13 +207,23 @@ def validate_image(name: str, entry: dict) -> None:
 
     node = next(component for component in components if component["id"] == "node")
     assert f"node:{node['version']}-" in config["base_images"]["node_base_image"]
-    if name == "go-contract-tools":
-        go = next(component for component in components if component["id"] == "go")
-        assert f"golang:{go['version']}-" in config["base_images"]["go_base_image"]
-
     verifier = image_dir / config["verifier"]
     assert verifier.is_file()
     assert verifier.stat().st_mode & 0o111
+    if name == "go-contract-tools":
+        go = next(component for component in components if component["id"] == "go")
+        assert f"golang:{go['version']}-" in config["base_images"]["go_base_image"]
+        assert claimed_buf_plugins == {
+            "buf.build/protocolbuffers/python:v29.3",
+            "buf.build/protocolbuffers/pyi:v29.3",
+            "buf.build/grpc/python:v1.68.0",
+        }
+        verifier_text = verifier.read_text(encoding="utf-8")
+        for output in ("echo_pb2.py", "echo_pb2.pyi", "echo_pb2_grpc.py"):
+            assert output in verifier_text
+        cmake = image_dir / "grpc-python-plugin.CMakeLists.txt"
+        assert cmake.is_file()
+        assert "protobuf::libprotoc" in cmake.read_text(encoding="utf-8")
 
 
 def validate_workflows() -> None:
@@ -180,6 +263,9 @@ def main() -> None:
     schema = read_json(ROOT / catalog["inventory_schema"])
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["properties"]["schema"]["const"] == 1
+    assert {"release-binary", "source-build"}.issubset(
+        schema["$defs"]["component"]["properties"]["kind"]["enum"]
+    )
     assert set(catalog["images"]) == IMAGE_NAMES
     for name, entry in catalog["images"].items():
         validate_image(name, entry)

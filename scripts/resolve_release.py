@@ -45,7 +45,7 @@ def resolve_release(tag: str, checked_revision: str) -> tuple[dict[str, str], li
 
     arguments = [
         f"{key.upper()}={value}"
-        for section in ("base_images", "tools", "packages")
+        for section in ("base_images", "tools", "packages", "sources", "artifacts")
         for key, value in config.get(section, {}).items()
     ]
     arguments.append(f"SOURCE_REVISION={revision}")

@@ -13,7 +13,7 @@ check:
 build: check
 	@test "$(IMAGE)" = go-contract-tools -o "$(IMAGE)" = playwright-client-tools
 	@set -eu; \
-	args="$$(python3 -c 'import json; c=json.load(open("images/$(IMAGE)/image.json")); print(" ".join("--build-arg %s=%s" % (k.upper(),v) for s in ("base_images","tools","packages") for k,v in c.get(s,{}).items()))')"; \
+	args="$$(python3 -c 'import json; c=json.load(open("images/$(IMAGE)/image.json")); print(" ".join("--build-arg %s=%s" % (k.upper(),v) for s in ("base_images","tools","packages","sources","artifacts") for k,v in c.get(s,{}).items()))')"; \
 	docker buildx build --load --tag "$(TAG)" $$args "images/$(IMAGE)"
 
 verify:

@@ -5,9 +5,10 @@ fixture=${1:?usage: verify-tool-image FIXTURE_DIRECTORY}
 test -d "$fixture"
 
 for command in \
-  buf go golangci-lint goimports oapi-codegen \
+  buf go golangci-lint goimports oapi-codegen protoc \
   protoc-gen-connect-go protoc-gen-doc protoc-gen-es \
-  protoc-gen-go protoc-gen-validate swagger-typescript-api tsc; do
+  protoc-gen-go protoc-gen-grpc_python protoc-gen-validate \
+  swagger-typescript-api tsc; do
   if ! command -v "$command" >/dev/null; then
     printf 'missing required command: %s\n' "$command" >&2
     exit 1
@@ -19,10 +20,12 @@ expected_buf=$(node -p "require('$config').tools.buf_version.replace(/^v/, '')")
 expected_golangci=$(node -p "require('$config').tools.golangci_version.replace(/^v/, '')")
 expected_go=$(node -p "require('$config').tools.go_version")
 expected_node=$(node -p "require('$config').tools.node_version")
+expected_protoc=$(node -p "require('$config').tools.protoc_version")
 actual_buf=$(buf --version)
 actual_golangci=$(golangci-lint --version)
 actual_go=$(go version)
 actual_node=$(node --version)
+actual_protoc=$(protoc --version)
 test "$actual_buf" = "$expected_buf" || {
   printf 'buf version mismatch: expected %s, got %s\n' "$expected_buf" "$actual_buf" >&2
   exit 1
@@ -39,6 +42,10 @@ test "$actual_node" = "v$expected_node" || {
   printf 'Node version mismatch: expected %s, got %s\n' "$expected_node" "$actual_node" >&2
   exit 1
 }
+test "$actual_protoc" = "libprotoc $expected_protoc" || {
+  printf 'protoc version mismatch: expected %s, got %s\n' "$expected_protoc" "$actual_protoc" >&2
+  exit 1
+}
 
 work=$(mktemp -d /tmp/go-contract-tools.XXXXXX)
 trap 'rm -rf "$work"' EXIT
@@ -52,6 +59,18 @@ buf generate
 find gen/go -type f -name '*.pb.go' -size +0c -print -quit | grep -q .
 find gen/go -type f -name '*.connect.go' -size +0c -print -quit | grep -q .
 find gen/ts -type f -name '*_pb.ts' -size +0c -print -quit | grep -q .
+
+mkdir -p gen/python
+printf '%s\n' 'verifying Protobuf and gRPC Python generation'
+protoc \
+  --proto_path=proto \
+  --python_out=gen/python \
+  --pyi_out=gen/python \
+  --grpc_python_out=gen/python \
+  proto/devtools/v1/echo.proto
+test -s gen/python/devtools/v1/echo_pb2.py
+test -s gen/python/devtools/v1/echo_pb2.pyi
+test -s gen/python/devtools/v1/echo_pb2_grpc.py
 
 mkdir -p gen/openapi gen/client
 printf '%s\n' 'verifying OpenAPI generators'
