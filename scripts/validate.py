@@ -7,6 +7,8 @@ import json
 import pathlib
 import re
 
+from resolve_release import resolve_release
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 IMAGE_NAMES = {"go-contract-tools", "playwright-client-tools"}
@@ -32,7 +34,8 @@ def resolve_version(config: dict, key: str) -> str:
 
 def validate_image(name: str, entry: dict) -> None:
     assert entry["registry"] == f"ghcr.io/wilksu/dev-tool-images/{name}"
-    assert entry["tag_prefix"] == f"{name}/v"
+    assert entry["release_tag_prefix"] == f"{name}/rev-"
+    assert entry["discovery_tag_prefix"] == "sha-"
     assert entry["inventory"] == f"images/{name}/image.json#inventory"
 
     config_path = ROOT / entry["config"]
@@ -102,6 +105,8 @@ def validate_image(name: str, entry: dict) -> None:
     assert npm_inventory == declared_npm
 
     dockerfile = (image_dir / "Dockerfile").read_text(encoding="utf-8")
+    assert "org.opencontainers.image.version" not in dockerfile
+    assert "IMAGE_VERSION" not in dockerfile
     for section in ("base_images", "tools", "packages"):
         for key in config.get(section, {}):
             assert re.search(rf"^ARG {re.escape(key.upper())}(?:=|$)", dockerfile, re.MULTILINE)
@@ -150,12 +155,27 @@ def validate_workflows() -> None:
         if "docker/setup-buildx-action@" in text:
             assert f"BUILDKIT_IMAGE: {BUILDKIT_IMAGE}" in text
             assert "image=${{ env.BUILDKIT_IMAGE }}" in text
+    publish = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+    assert "docker/metadata-action@" not in publish
+    assert "org.opencontainers.image.version" not in publish
+    assert "IMAGE_VERSION" not in publish
+    assert "run: python3 scripts/resolve_release.py" in publish
+    assert "Verify published manifest anonymously" in publish
+    resolver = (ROOT / "scripts/resolve_release.py").read_text(encoding="utf-8")
+    assert "discovery_tag_prefix" in resolver
+    assert "release_tag_prefix" in resolver
 
 
 def main() -> None:
     catalog = read_json(ROOT / "catalog/v1/images.json")
-    assert catalog["schema"] == 1
+    assert catalog["schema"] == 2
     assert catalog["source_repository"] == "wilksu/dev-tool-images"
+    assert catalog["identity"] == {
+        "release": "source_revision",
+        "discovery": "source_revision_tag",
+        "consumer": "oci_manifest_digest",
+        "source_revision_pattern": "^[0-9a-f]{40}$",
+    }
     assert catalog["inventory_schema"] == "catalog/v1/inventory.schema.json"
     schema = read_json(ROOT / catalog["inventory_schema"])
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
@@ -163,6 +183,23 @@ def main() -> None:
     assert set(catalog["images"]) == IMAGE_NAMES
     for name, entry in catalog["images"].items():
         validate_image(name, entry)
+        revision = "a" * 40
+        release, _ = resolve_release(
+            f"{entry['release_tag_prefix']}{revision}", revision
+        )
+        assert release["image_name"] == name
+        assert release["revision"] == revision
+        assert release["discovery_tag"] == (
+            f"{entry['registry']}:{entry['discovery_tag_prefix']}{revision}"
+        )
+        try:
+            resolve_release(
+                f"{entry['release_tag_prefix']}{revision}", "b" * 40
+            )
+        except ValueError as error:
+            assert "does not match checked-out commit" in str(error)
+        else:
+            raise AssertionError("revision mismatch was accepted")
     validate_workflows()
 
 

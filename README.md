@@ -43,15 +43,18 @@ The repository deliberately has four non-overlapping authorities:
    manifests, OCI labels, SBOM, and provenance;
 4. each consumer lock owns the exact digest and source revision it has accepted.
 
-Release tags are discovery handles. Runtime and CI consumers must use a digest:
+Source revisions are the release identity. Git revision tags and OCI
+`sha-<revision>` tags are discovery handles only. Runtime and CI consumers must
+use a manifest digest:
 
 ```text
 ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:<digest>
 ghcr.io/wilksu/dev-tool-images/playwright-client-tools@sha256:<digest>
 ```
 
-There is intentionally no `latest` tag and no mutable digest in the catalog.
-Normal consumer CI must never resolve public `master` dynamically.
+The catalog stores no released digest: accepting a release is a consumer-owned
+decision. Normal consumer CI must never resolve public `master` or a discovery
+tag dynamically.
 
 ## Local development
 
@@ -80,18 +83,20 @@ Buildx container driver is also fixed by OCI digest in every workflow.
 
 ## Releases
 
-One Git tag releases exactly one image:
+One Git tag releases exactly one image from the commit named in the tag:
 
 ```text
-go-contract-tools/v1.0.0
-playwright-client-tools/v1.0.0
+go-contract-tools/rev-<40-hex-source-revision>
+playwright-client-tools/rev-<40-hex-source-revision>
 ```
 
-The publish workflow resolves the tag through the catalog, builds a multi-
-platform image, publishes `:vX.Y.Z` and `:sha-<revision>` discovery tags, emits
-BuildKit SBOM and max-mode provenance attestations, records GitHub build
-provenance, and verifies that the resulting manifest contains both required
-platforms. It never publishes `latest` and never writes back to the repository.
+The publish workflow resolves the tag through the catalog and rejects it unless
+the embedded revision is exactly the checked-out commit. It builds a multi-
+platform image, publishes only the `:sha-<revision>` discovery tag, emits
+BuildKit SBOM and max-mode provenance attestations, and records GitHub build
+provenance. Its final check uses the anonymous GHCR token flow to prove the
+published digest and both required platforms without relying on the workflow's
+registry login. The workflow never writes back to the repository.
 
 The first publish of each GHCR package is a bootstrap operation. The OCI source
 label links the package to this public repository, and the release must prove an
@@ -109,7 +114,7 @@ requires every `tools` and `packages` build version to have one inventory entry,
 requires the npm inventory to equal the exact root manifest and lock, and rejects
 un-digested BuildKit configuration. Updating an image means changing its owned
 configuration, regenerating the exact npm lock when applicable, passing native
-CI, and creating a new image-specific semantic-version tag.
+CI, and creating a new image-specific revision tag for the final source commit.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and
 [THIRD_PARTY.md](THIRD_PARTY.md) for the direct tool inventory. Published SBOM

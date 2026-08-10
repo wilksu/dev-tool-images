@@ -13,7 +13,8 @@ report, determine affected release digests, and coordinate a fixed release.
 
 ## Supported releases
 
-Tool images are immutable. A fixed image is published under a new semantic
-version and digest; published manifests are never replaced in place. Consumers
+Tool images are immutable. A fixed image is published from a new source
+revision and receives a new manifest digest; published manifests are never
+replaced in place. Revision-derived tags are discovery handles only. Consumers
 are responsible for updating their own digest locks after validating a fixed
 candidate.

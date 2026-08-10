@@ -1,19 +1,27 @@
 {
-  "schema": 1,
+  "schema": 2,
   "source_repository": "wilksu/dev-tool-images",
+  "identity": {
+    "release": "source_revision",
+    "discovery": "source_revision_tag",
+    "consumer": "oci_manifest_digest",
+    "source_revision_pattern": "^[0-9a-f]{40}$"
+  },
   "inventory_schema": "catalog/v1/inventory.schema.json",
   "images": {
     "go-contract-tools": {
       "registry": "ghcr.io/wilksu/dev-tool-images/go-contract-tools",
       "config": "images/go-contract-tools/image.json",
       "inventory": "images/go-contract-tools/image.json#inventory",
-      "tag_prefix": "go-contract-tools/v"
+      "release_tag_prefix": "go-contract-tools/rev-",
+      "discovery_tag_prefix": "sha-"
     },
     "playwright-client-tools": {
       "registry": "ghcr.io/wilksu/dev-tool-images/playwright-client-tools",
       "config": "images/playwright-client-tools/image.json",
       "inventory": "images/playwright-client-tools/image.json#inventory",
-      "tag_prefix": "playwright-client-tools/v"
+      "release_tag_prefix": "playwright-client-tools/rev-",
+      "discovery_tag_prefix": "sha-"
     }
   }
 }

@@ -3,8 +3,8 @@ name: Publish
 on:
   push:
     tags:
-      - go-contract-tools/v[0-9]*.[0-9]*.[0-9]*
-      - playwright-client-tools/v[0-9]*.[0-9]*.[0-9]*
+      - go-contract-tools/rev-*
+      - playwright-client-tools/rev-*
 
 permissions:
   contents: read
@@ -21,64 +21,17 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish immutable multi-platform image
+    name: Publish immutable revision image
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - id: release
-        name: Resolve tag through the public catalog
+        name: Resolve source revision through the public catalog
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import re
-
-          catalog = json.loads(pathlib.Path("catalog/v1/images.json").read_text())
-          tag = os.environ["RELEASE_TAG"]
-          selected = [
-              (name, entry)
-              for name, entry in catalog["images"].items()
-              if tag.startswith(entry["tag_prefix"])
-          ]
-          if len(selected) != 1:
-              raise SystemExit(f"tag selects {len(selected)} images, expected exactly one")
-          name, entry = selected[0]
-          version_number = tag.removeprefix(entry["tag_prefix"])
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version_number):
-              raise SystemExit(f"invalid release version: {version_number}")
-          version = f"v{version_number}"
-          config = json.loads(pathlib.Path(entry["config"]).read_text())
-          if config["name"] != name:
-              raise SystemExit("catalog and image configuration disagree")
-          if config["platforms"] != ["linux/amd64", "linux/arm64"]:
-              raise SystemExit("release platform contract is not the required pair")
-          arguments = []
-          for section in ("base_images", "tools", "packages"):
-              arguments.extend(
-                  f"{key.upper()}={value}"
-                  for key, value in config.get(section, {}).items()
-              )
-          arguments.extend([
-              f"IMAGE_VERSION={version}",
-              f"SOURCE_REVISION={os.environ['GITHUB_SHA']}",
-          ])
-          outputs = {
-              "image_name": name,
-              "image": entry["registry"],
-              "version": version,
-              "context": str(pathlib.Path(entry["config"]).parent),
-          }
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              for key, value in outputs.items():
-                  output.write(f"{key}={value}\n")
-              output.write("build_args<<BUILD_ARGS\n")
-              output.write("\n".join(arguments))
-              output.write("\nBUILD_ARGS\n")
-          PY
+          SOURCE_REVISION: ${{ github.sha }}
+        run: python3 scripts/resolve_release.py
       - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
@@ -89,28 +42,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: metadata
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
-        with:
-          images: ${{ steps.release.outputs.image }}
-          tags: |
-            type=raw,value=${{ steps.release.outputs.version }}
-            type=sha,format=long,prefix=sha-
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.release.outputs.version }}
-            io.starferry.tool.name=${{ steps.release.outputs.image_name }}
       - id: build
-        name: Build and publish multi-platform image
+        name: Build and publish multi-platform revision image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: ${{ steps.release.outputs.context }}
           file: ${{ steps.release.outputs.context }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          tags: ${{ steps.release.outputs.discovery_tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
+            io.starferry.tool.name=${{ steps.release.outputs.image_name }}
+            io.starferry.tool.inventory-path=${{ steps.release.outputs.inventory_path }}
           build-args: ${{ steps.release.outputs.build_args }}
           cache-from: type=gha,scope=${{ steps.release.outputs.image_name }}-publish
           cache-to: type=gha,mode=max,scope=${{ steps.release.outputs.image_name }}-publish
@@ -122,18 +67,57 @@ jobs:
           subject-name: ${{ steps.release.outputs.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-      - name: Verify the published manifest contract
+      - name: Verify published manifest anonymously
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE: ${{ steps.release.outputs.image }}
+          REVISION: ${{ steps.release.outputs.revision }}
         run: |
-          docker buildx imagetools inspect "$IMAGE@$DIGEST" --raw > "$RUNNER_TEMP/manifest.json"
           python3 - <<'PY'
+          import hashlib
           import json
           import os
-          import pathlib
+          import urllib.parse
+          import urllib.request
 
-          manifest = json.loads(pathlib.Path(os.environ["RUNNER_TEMP"], "manifest.json").read_text())
+          image = os.environ["IMAGE"]
+          if not image.startswith("ghcr.io/"):
+              raise SystemExit(f"unsupported registry: {image}")
+          repository = image.removeprefix("ghcr.io/")
+          query = urllib.parse.urlencode({
+              "scope": f"repository:{repository}:pull",
+          })
+          with urllib.request.urlopen(
+              f"https://ghcr.io/token?{query}", timeout=30
+          ) as response:
+              token = json.load(response)["token"]
+          request = urllib.request.Request(
+              f"https://ghcr.io/v2/{repository}/manifests/"
+              f"sha-{os.environ['REVISION']}",
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": (
+                      "application/vnd.oci.image.index.v1+json,"
+                      "application/vnd.docker.distribution.manifest.list.v2+json"
+                  ),
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              body = response.read()
+              header_digest = response.headers.get("Docker-Content-Digest")
+          computed_digest = "sha256:" + hashlib.sha256(body).hexdigest()
+          expected_digest = os.environ["DIGEST"]
+          if computed_digest != expected_digest:
+              raise SystemExit(
+                  f"anonymous manifest digest mismatch: "
+                  f"expected {expected_digest}, got {computed_digest}"
+              )
+          if header_digest and header_digest != expected_digest:
+              raise SystemExit(
+                  f"registry digest mismatch: expected {expected_digest}, "
+                  f"got {header_digest}"
+              )
+          manifest = json.loads(body)
           platforms = {
               (item.get("platform") or {}).get("os", "") + "/" +
               (item.get("platform") or {}).get("architecture", "")
@@ -141,5 +125,13 @@ jobs:
           }
           required = {"linux/amd64", "linux/arm64"}
           if not required.issubset(platforms):
-              raise SystemExit(f"published manifest is missing platforms: {required - platforms}")
+              raise SystemExit(
+                  f"published manifest is missing platforms: "
+                  f"{required - platforms}"
+              )
+          print(json.dumps({
+              "anonymous": True,
+              "digest": expected_digest,
+              "platforms": sorted(required),
+          }, sort_keys=True))
           PY

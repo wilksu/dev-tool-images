@@ -53,16 +53,15 @@ COPY verify.sh /usr/local/bin/verify-tool-image
 
 ARG GO_VERSION
 ARG NODE_VERSION
-ARG IMAGE_VERSION=unreleased
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.title="go-contract-tools" \
       org.opencontainers.image.description="Pinned Go, Proto, OpenAPI, and TypeScript contract toolchain" \
       org.opencontainers.image.source="https://github.com/wilksu/dev-tool-images" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
-      org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       io.starferry.tool.schema="2" \
       io.starferry.tool.name="go-contract-tools" \
+      io.starferry.tool.inventory-path="images/go-contract-tools/image.json#inventory" \
       io.starferry.tool.go-version="${GO_VERSION}" \
       io.starferry.tool.node-version="${NODE_VERSION}"
 
