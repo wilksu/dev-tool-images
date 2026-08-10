@@ -8,7 +8,7 @@ the authoritative release-specific transitive inventory.
 | Component | Version | Upstream source | License |
 | --- | --- | --- | --- |
 | Go | 1.26.4 | `github.com/golang/go` | BSD-3-Clause |
-| Node.js | 24 | `github.com/nodejs/node` | MIT and bundled third-party notices |
+| Node.js | 24.18.0 | `github.com/nodejs/node` | MIT and bundled third-party notices |
 | Buf | 1.66.1 | `github.com/bufbuild/buf` | Apache-2.0 |
 | golangci-lint | 2.12.0 | `github.com/golangci/golangci-lint` | GPL-3.0-only |
 | protoc-gen-go | 1.36.11 | `github.com/protocolbuffers/protobuf-go` | BSD-3-Clause |
@@ -22,8 +22,16 @@ the authoritative release-specific transitive inventory.
 | TypeScript | 5.7.3 | `github.com/microsoft/TypeScript` | Apache-2.0 |
 | Playwright | 1.61.0 | `github.com/microsoft/playwright` | Apache-2.0 |
 | Node.js type declarations | 24.13.3 | `github.com/DefinitelyTyped/DefinitelyTyped` | MIT |
+| Bash | 5.3.9-r1 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later |
+| GCC | 15.2.0-r5 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later with runtime exception |
+| Git | 2.54.0-r0 | `gitlab.alpinelinux.org/alpine/aports` | GPL-2.0-only |
+| Make | 4.4.1-r4 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later |
+| musl development files | 1.2.6-r2 | `gitlab.alpinelinux.org/alpine/aports` | MIT |
+| Perl | 5.42.2-r0 | `gitlab.alpinelinux.org/alpine/aports` | Artistic-1.0-Perl OR GPL-1.0-or-later |
+| Python | 3.14.5-r0 | `gitlab.alpinelinux.org/alpine/aports` | Python-2.0 |
 
-Exact source versions are retained in each `image.json`, `package.json`, and
-`package-lock.json`. Base images additionally contain Alpine packages and their
-transitive dependencies; consult the published SBOM before redistribution or
-policy admission.
+Exact direct versions and upstream sources are exposed through each
+`image.json` inventory and cross-checked against `package.json`,
+`package-lock.json`, and Docker build arguments. Base images and direct packages
+add transitive dependencies; consult the published SBOM before redistribution
+or policy admission.

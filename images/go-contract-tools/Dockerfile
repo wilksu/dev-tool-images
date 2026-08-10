@@ -29,15 +29,19 @@ FROM ${NODE_BASE_IMAGE}
 
 ARG ALPINE_GIT_VERSION
 ARG ALPINE_GCC_VERSION
+ARG ALPINE_BASH_VERSION
+ARG ALPINE_MAKE_VERSION
 ARG ALPINE_MUSL_DEV_VERSION
+ARG ALPINE_PERL_VERSION
+ARG ALPINE_PYTHON3_VERSION
 RUN apk add --no-cache \
-      bash \
+      "bash=${ALPINE_BASH_VERSION}" \
       "gcc=${ALPINE_GCC_VERSION}" \
       "git=${ALPINE_GIT_VERSION}" \
-      make \
+      "make=${ALPINE_MAKE_VERSION}" \
       "musl-dev=${ALPINE_MUSL_DEV_VERSION}" \
-      perl \
-      python3
+      "perl=${ALPINE_PERL_VERSION}" \
+      "python3=${ALPINE_PYTHON3_VERSION}"
 
 WORKDIR /opt/go-contract-tools
 COPY package.json package-lock.json image.json ./
@@ -48,6 +52,7 @@ COPY --from=go-tools /usr/local/go/ /usr/local/go/
 COPY verify.sh /usr/local/bin/verify-tool-image
 
 ARG GO_VERSION
+ARG NODE_VERSION
 ARG IMAGE_VERSION=unreleased
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.title="go-contract-tools" \
@@ -56,9 +61,10 @@ LABEL org.opencontainers.image.title="go-contract-tools" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      io.starferry.tool.schema="1" \
+      io.starferry.tool.schema="2" \
       io.starferry.tool.name="go-contract-tools" \
-      io.starferry.tool.go-version="${GO_VERSION}"
+      io.starferry.tool.go-version="${GO_VERSION}" \
+      io.starferry.tool.node-version="${NODE_VERSION}"
 
 ENV GOROOT=/usr/local/go \
     HOME=/tmp/home \

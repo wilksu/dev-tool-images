@@ -4,14 +4,11 @@ TAG ?= dev-tool-images/$(IMAGE):local
 .PHONY: check build verify
 
 check:
-	@python3 -m json.tool catalog/v1/images.json >/dev/null
-	@python3 -m json.tool images/go-contract-tools/image.json >/dev/null
-	@python3 -m json.tool images/playwright-client-tools/image.json >/dev/null
+	@python3 scripts/validate.py
 	@python3 -m json.tool images/go-contract-tools/package-lock.json >/dev/null
 	@python3 -m json.tool images/playwright-client-tools/package-lock.json >/dev/null
 	@for file in images/*/verify.sh; do test -x "$$file"; done
 	@! grep -R -n -E '(^|[^[:alnum:]_-])latest([^[:alnum:]_-]|$$)' catalog images .github/workflows
-	@python3 -c 'import pathlib,re; files=pathlib.Path(".github/workflows").glob("*.yml"); bad=[line for f in files for line in f.read_text().splitlines() if (m:=re.search(r"\buses:\s*[^@\s]+@([^\s#]+)",line)) and not re.fullmatch(r"[0-9a-f]{40}",m.group(1))]; assert not bad,bad'
 
 build: check
 	@test "$(IMAGE)" = go-contract-tools -o "$(IMAGE)" = playwright-client-tools

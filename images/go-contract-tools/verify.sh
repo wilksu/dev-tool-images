@@ -18,9 +18,11 @@ config=/opt/go-contract-tools/image.json
 expected_buf=$(node -p "require('$config').tools.buf_version.replace(/^v/, '')")
 expected_golangci=$(node -p "require('$config').tools.golangci_version.replace(/^v/, '')")
 expected_go=$(node -p "require('$config').tools.go_version")
+expected_node=$(node -p "require('$config').tools.node_version")
 actual_buf=$(buf --version)
 actual_golangci=$(golangci-lint --version)
 actual_go=$(go version)
+actual_node=$(node --version)
 test "$actual_buf" = "$expected_buf" || {
   printf 'buf version mismatch: expected %s, got %s\n' "$expected_buf" "$actual_buf" >&2
   exit 1
@@ -31,6 +33,10 @@ printf '%s\n' "$actual_golangci" | grep -F "version $expected_golangci" >/dev/nu
 }
 printf '%s\n' "$actual_go" | grep -F "go$expected_go" >/dev/null || {
   printf 'Go version mismatch: expected %s, got %s\n' "$expected_go" "$actual_go" >&2
+  exit 1
+}
+test "$actual_node" = "v$expected_node" || {
+  printf 'Node version mismatch: expected %s, got %s\n' "$expected_node" "$actual_node" >&2
   exit 1
 }
 

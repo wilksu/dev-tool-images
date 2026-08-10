@@ -1,15 +1,18 @@
 {
   "schema": 1,
   "source_repository": "wilksu/dev-tool-images",
+  "inventory_schema": "catalog/v1/inventory.schema.json",
   "images": {
     "go-contract-tools": {
       "registry": "ghcr.io/wilksu/dev-tool-images/go-contract-tools",
       "config": "images/go-contract-tools/image.json",
+      "inventory": "images/go-contract-tools/image.json#inventory",
       "tag_prefix": "go-contract-tools/v"
     },
     "playwright-client-tools": {
       "registry": "ghcr.io/wilksu/dev-tool-images/playwright-client-tools",
       "config": "images/playwright-client-tools/image.json",
+      "inventory": "images/playwright-client-tools/image.json#inventory",
       "tag_prefix": "playwright-client-tools/v"
     }
   }

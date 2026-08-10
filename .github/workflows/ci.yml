@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  BUILDKIT_IMAGE: moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,49 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Validate catalog and image configurations
-        run: |
-          python3 - <<'PY'
-          import json
-          import pathlib
-          import re
-
-          root = pathlib.Path.cwd()
-          catalog = json.loads((root / "catalog/v1/images.json").read_text())
-          assert catalog["schema"] == 1
-          assert catalog["source_repository"] == "wilksu/dev-tool-images"
-          assert set(catalog["images"]) == {
-              "go-contract-tools",
-              "playwright-client-tools",
-          }
-
-          digest = re.compile(r"@sha256:[0-9a-f]{64}$")
-          exact_npm = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
-          for name, entry in catalog["images"].items():
-              assert entry["registry"] == f"ghcr.io/wilksu/dev-tool-images/{name}"
-              assert entry["tag_prefix"] == f"{name}/v"
-              config_path = root / entry["config"]
-              config = json.loads(config_path.read_text())
-              assert config["schema"] == 1
-              assert config["name"] == name
-              assert config["platforms"] == ["linux/amd64", "linux/arm64"]
-              assert all(digest.search(value) for value in config["base_images"].values())
-              image_dir = config_path.parent
-              package = json.loads((image_dir / "package.json").read_text())
-              lock = json.loads((image_dir / config["npm_lock"]).read_text())
-              for group in ("dependencies", "devDependencies"):
-                  declared = package.get(group, {})
-                  assert all(exact_npm.fullmatch(value) for value in declared.values())
-                  assert lock["packages"][""] .get(group, {}) == declared
-              verifier = image_dir / config["verifier"]
-              assert verifier.is_file()
-              assert verifier.stat().st_mode & 0o111
-
-          for workflow in (root / ".github/workflows").glob("*.yml"):
-              for line in workflow.read_text().splitlines():
-                  match = re.search(r"\buses:\s*[^@\s]+@([^\s#]+)", line)
-                  if match:
-                      assert re.fullmatch(r"[0-9a-f]{40}", match.group(1)), line
-          PY
+        run: python3 scripts/validate.py
 
   build-and-verify:
     name: ${{ matrix.image }} (${{ matrix.arch }})
@@ -100,6 +61,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          driver-opts: |
+            image=${{ env.BUILDKIT_IMAGE }}
       - id: config
         name: Resolve authoritative build arguments
         env:

@@ -11,10 +11,26 @@ consumers accept immutable OCI digests instead of rebuilding these toolchains.
 | `go-contract-tools` | Go, Buf, Proto, OpenAPI, and TypeScript contract generation and quality tools | N/A |
 | `playwright-client-tools` | Playwright client, Node types, and TypeScript for browserless test discovery and execution | No |
 
-The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json).
-Each catalog entry points to an `image.json` that owns base-image and tool
-versions, supported platforms, capabilities, npm lock location, and verifier.
-README prose is not a machine interface.
+The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json),
+which also publishes the inventory pointers and their
+[`inventory.schema.json`](catalog/v1/inventory.schema.json).
+Each catalog entry points to a schema-2 `image.json` that owns base-image and
+build versions, supported platforms, capabilities, npm lock location, verifier,
+and a normalized `inventory.components` array. Every directly selected runtime,
+Go module, npm package, and Alpine package has a machine-readable component ID,
+kind, package name, exact version, and upstream source. README prose and
+`THIRD_PARTY.md` are human projections, not machine interfaces.
+
+For example, consumers and update automation can enumerate the Contract tools
+without parsing a Dockerfile or Markdown:
+
+```sh
+jq '.inventory.components[] | {id, kind, package, version}' \
+  images/go-contract-tools/image.json
+```
+
+The committed inventory intentionally covers direct inputs. Release-specific
+transitive packages are authoritative in the published SBOM attestation.
 
 ## Identity model
 
@@ -59,7 +75,8 @@ installing or launching a browser.
 
 Pull requests and `master` build and execute both images on native
 `linux/amd64` and `linux/arm64` hosted runners. Exact action commit SHAs are
-used throughout the workflows.
+used throughout the workflows. The official BuildKit daemon image used by the
+Buildx container driver is also fixed by OCI digest in every workflow.
 
 ## Releases
 
@@ -86,10 +103,13 @@ workflow intentionally does not have or seek permission to change visibility.
 
 Builds use only public dependencies and do not accept secrets. Do not pass
 credentials through build arguments or environment variables: provenance can
-record build parameters. Base images, npm direct dependencies, and Go tool
-versions are exact. Updating an image means changing its owned configuration,
-regenerating the exact npm lock when applicable, passing native CI, and creating
-a new image-specific semantic-version tag.
+record build parameters. Base images, BuildKit, direct Alpine packages, npm
+direct dependencies, and Go tool versions are exact. The machine-contract check
+requires every `tools` and `packages` build version to have one inventory entry,
+requires the npm inventory to equal the exact root manifest and lock, and rejects
+un-digested BuildKit configuration. Updating an image means changing its owned
+configuration, regenerating the exact npm lock when applicable, passing native
+CI, and creating a new image-specific semantic-version tag.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and
 [THIRD_PARTY.md](THIRD_PARTY.md) for the direct tool inventory. Published SBOM

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wilksu/dev-tool-images/master/catalog/v1/inventory.schema.json",
+  "title": "dev-tool-images direct component inventory",
+  "type": "object",
+  "required": [
+    "schema",
+    "scope",
+    "transitive_inventory",
+    "components"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "scope": {
+      "const": "direct"
+    },
+    "transitive_inventory": {
+      "const": "published-sbom"
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "package",
+        "version",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "kind": {
+          "enum": [
+            "runtime",
+            "go-module",
+            "npm-package",
+            "alpine-package"
+          ]
+        },
+        "package": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)+([-+][0-9A-Za-z.-]+)?$"
+        },
+        "source": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "version_key": {
+          "type": "string",
+          "pattern": "^(tools|packages)\\.[a-z0-9_]+$"
+        },
+        "manifest": {
+          "enum": [
+            "package.json#dependencies",
+            "package.json#devDependencies"
+          ]
+        },
+        "install_target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "npm-package"
+              }
+            }
+          },
+          "then": {
+            "required": ["manifest"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "go-module"
+              }
+            }
+          },
+          "then": {
+            "required": ["version_key", "install_target", "executables"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": ["runtime", "alpine-package"]
+              }
+            }
+          },
+          "then": {
+            "required": ["version_key"]
+          }
+        }
+      ]
+    }
+  }
+}
