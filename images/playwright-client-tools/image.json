@@ -1,23 +1,14 @@
 {
-  "schema": 2,
+  "schema": 3,
   "name": "playwright-client-tools",
-  "platforms": [
-    "linux/amd64",
-    "linux/arm64"
-  ],
   "base_images": {
     "node_base_image": "node:24.18.0-alpine3.24@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd"
   },
-  "tools": {
-    "node_version": "24.18.0"
-  },
   "capabilities": {
-    "playwright_client": true,
-    "browser_binaries": false,
-    "typescript": true
+    "browser_binaries": false
   },
   "inventory": {
-    "schema": 1,
+    "schema": 2,
     "scope": "direct",
     "transitive_inventory": "published-sbom",
     "components": [
@@ -26,7 +17,6 @@
         "kind": "runtime",
         "package": "node",
         "version": "24.18.0",
-        "version_key": "tools.node_version",
         "source": "https://github.com/nodejs/node",
         "executables": ["node", "npm", "npx"]
       },

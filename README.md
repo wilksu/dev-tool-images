@@ -14,13 +14,17 @@ consumers accept immutable OCI digests instead of rebuilding these toolchains.
 The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json),
 which also publishes the inventory pointers and their
 [`inventory.schema.json`](catalog/v1/inventory.schema.json).
-Each catalog entry points to a schema-2 `image.json` that owns base-image and
-build versions, supported platforms, capabilities, npm lock location, verifier,
-and a normalized `inventory.components` array. Every directly selected runtime,
+Each catalog entry points to a schema-3 `image.json` with a schema-2 inventory.
+The catalog owns shared
+platforms and verification fixtures; each image file owns its base images,
+constraints, npm lock location, verifier, and normalized
+`inventory.components` array. Every directly selected runtime,
 Go module, npm package, Alpine package, release binary, and source-built tool
 has a machine-readable component ID, kind, package name, exact version, and
 upstream source. Release binaries also expose per-platform URLs and checksums;
-source-built tools expose the exact upstream revision. README prose and
+source-built tools expose the exact upstream revision. Component versions,
+source revisions, and artifact checksums appear once in the inventory; build
+arguments are projections generated from the adjacent `*_arg` names. README prose and
 `THIRD_PARTY.md` are human projections, not machine interfaces.
 
 For example, consumers and update automation can enumerate the Contract tools
@@ -60,8 +64,10 @@ tag dynamically.
 
 ## Local development
 
-Docker Buildx and Python 3 are the only host requirements. Build and verify one
-image on the native platform with:
+Docker Buildx, Python 3, and the pinned `requirements-ci.txt` schema validator
+are the host requirements. CI installs the Python validator only on the hosted
+runner; this repository does not require host Go, Node, npm, or project Python
+packages. Build and verify one image on the native platform with:
 
 ```sh
 make build IMAGE=go-contract-tools
@@ -113,11 +119,12 @@ Builds use only public dependencies and do not accept secrets. Do not pass
 credentials through build arguments or environment variables: provenance can
 record build parameters. Base images, BuildKit, direct Alpine packages, npm
 direct dependencies, and Go tool versions are exact. The machine-contract check
-requires every `tools` and `packages` build version to have one inventory entry,
-requires the npm inventory to equal the exact root manifest and lock, and rejects
-un-digested BuildKit configuration. Updating an image means changing its owned
-configuration, regenerating the exact npm lock when applicable, passing native
-CI, and creating a new image-specific revision tag for the final source commit.
+derives Docker build arguments from inventory values, requires the npm inventory
+to equal the exact root manifest and lock, validates inventory against the
+published JSON Schema, and rejects un-digested or divergent BuildKit
+configuration. Updating an image means changing its owned inventory,
+regenerating the exact npm lock when applicable, passing native CI, and creating
+a new image-specific revision tag for the final source commit.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and
 [THIRD_PARTY.md](THIRD_PARTY.md) for the direct tool inventory. Published SBOM

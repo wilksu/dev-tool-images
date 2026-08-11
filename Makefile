@@ -11,17 +11,10 @@ check:
 	@! grep -R -n -E '(^|[^[:alnum:]_-])latest([^[:alnum:]_-]|$$)' catalog images .github/workflows
 
 build: check
-	@test "$(IMAGE)" = go-contract-tools -o "$(IMAGE)" = playwright-client-tools
 	@set -eu; \
-	args="$$(python3 -c 'import json; c=json.load(open("images/$(IMAGE)/image.json")); print(" ".join("--build-arg %s=%s" % (k.upper(),v) for s in ("base_images","tools","packages","sources","artifacts") for k,v in c.get(s,{}).items()))')"; \
+	args="$$(python3 scripts/image_config.py build-args "$(IMAGE)" | sed 's/^/--build-arg /')"; \
 	docker buildx build --load --tag "$(TAG)" $$args "images/$(IMAGE)"
 
 verify:
-	@test "$(IMAGE)" = go-contract-tools -o "$(IMAGE)" = playwright-client-tools
-	@set -eu; \
-	case "$(IMAGE)" in go-contract-tools) fixture=contract ;; playwright-client-tools) fixture=playwright ;; esac; \
-	docker run --rm --network none --read-only --cap-drop ALL \
-		--security-opt no-new-privileges \
-		--tmpfs /tmp:rw,nosuid,nodev,size=256m \
-		--mount "type=bind,src=$(CURDIR),dst=/src,readonly" \
-		"$(TAG)" verify-tool-image "/src/fixtures/$$fixture"
+	@scripts/verify_image.sh "$(TAG)" \
+		"$$(python3 scripts/image_config.py fixture "$(IMAGE)")"

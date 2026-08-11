@@ -3,8 +3,7 @@ name: Publish
 on:
   push:
     tags:
-      - go-contract-tools/rev-*
-      - playwright-client-tools/rev-*
+      - '*/rev-*'
 
 permissions:
   contents: read
@@ -48,7 +47,7 @@ jobs:
         with:
           context: ${{ steps.release.outputs.context }}
           file: ${{ steps.release.outputs.context }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ steps.release.outputs.platforms }}
           push: true
           tags: ${{ steps.release.outputs.discovery_tag }}
           labels: |
@@ -74,67 +73,11 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE: ${{ steps.release.outputs.image }}
+          PLATFORMS: ${{ steps.release.outputs.platforms }}
           REVISION: ${{ steps.release.outputs.revision }}
-        run: |
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          import urllib.parse
-          import urllib.request
-
-          image = os.environ["IMAGE"]
-          if not image.startswith("ghcr.io/"):
-              raise SystemExit(f"unsupported registry: {image}")
-          repository = image.removeprefix("ghcr.io/")
-          query = urllib.parse.urlencode({
-              "scope": f"repository:{repository}:pull",
-          })
-          with urllib.request.urlopen(
-              f"https://ghcr.io/token?{query}", timeout=30
-          ) as response:
-              token = json.load(response)["token"]
-          request = urllib.request.Request(
-              f"https://ghcr.io/v2/{repository}/manifests/"
-              f"sha-{os.environ['REVISION']}",
-              headers={
-                  "Authorization": f"Bearer {token}",
-                  "Accept": (
-                      "application/vnd.oci.image.index.v1+json,"
-                      "application/vnd.docker.distribution.manifest.list.v2+json"
-                  ),
-              },
-          )
-          with urllib.request.urlopen(request, timeout=30) as response:
-              body = response.read()
-              header_digest = response.headers.get("Docker-Content-Digest")
-          computed_digest = "sha256:" + hashlib.sha256(body).hexdigest()
-          expected_digest = os.environ["DIGEST"]
-          if computed_digest != expected_digest:
-              raise SystemExit(
-                  f"anonymous manifest digest mismatch: "
-                  f"expected {expected_digest}, got {computed_digest}"
-              )
-          if header_digest and header_digest != expected_digest:
-              raise SystemExit(
-                  f"registry digest mismatch: expected {expected_digest}, "
-                  f"got {header_digest}"
-              )
-          manifest = json.loads(body)
-          platforms = {
-              (item.get("platform") or {}).get("os", "") + "/" +
-              (item.get("platform") or {}).get("architecture", "")
-              for item in manifest.get("manifests", [])
-          }
-          required = {"linux/amd64", "linux/arm64"}
-          if not required.issubset(platforms):
-              raise SystemExit(
-                  f"published manifest is missing platforms: "
-                  f"{required - platforms}"
-              )
-          print(json.dumps({
-              "anonymous": True,
-              "digest": expected_digest,
-              "platforms": sorted(required),
-          }, sort_keys=True))
-          PY
+        run: >-
+          python3 scripts/verify_manifest.py
+          --image "$IMAGE"
+          --revision "$REVISION"
+          --digest "$DIGEST"
+          --platforms "$PLATFORMS"

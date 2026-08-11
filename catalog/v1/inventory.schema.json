@@ -11,7 +11,7 @@
   ],
   "properties": {
     "schema": {
-      "const": 1
+      "const": 2
     },
     "scope": {
       "const": "direct"
@@ -66,9 +66,9 @@
           "format": "uri",
           "pattern": "^https://"
         },
-        "version_key": {
+        "version_arg": {
           "type": "string",
-          "pattern": "^(tools|packages)\\.[a-z0-9_]+$"
+          "pattern": "^[A-Z][A-Z0-9_]*$"
         },
         "manifest": {
           "enum": [
@@ -102,9 +102,9 @@
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
         },
-        "source_revision_key": {
+        "source_revision_arg": {
           "type": "string",
-          "pattern": "^sources\\.[a-z0-9_]+$"
+          "pattern": "^[A-Z][A-Z0-9_]*$"
         },
         "artifacts": {
           "type": "array",
@@ -144,19 +144,19 @@
             }
           },
           "then": {
-            "required": ["version_key", "install_target", "executables"]
+            "required": ["version_arg", "install_target", "executables"]
           }
         },
         {
           "if": {
             "properties": {
               "kind": {
-                "enum": ["runtime", "alpine-package"]
+                "const": "alpine-package"
               }
             }
           },
           "then": {
-            "required": ["version_key"]
+            "required": ["version_arg"]
           }
         },
         {
@@ -168,7 +168,7 @@
             }
           },
           "then": {
-            "required": ["version_key", "executables", "artifacts"]
+            "required": ["version_arg", "executables", "artifacts"]
           }
         },
         {
@@ -181,10 +181,10 @@
           },
           "then": {
             "required": [
-              "version_key",
+              "version_arg",
               "executables",
               "source_revision",
-              "source_revision_key"
+              "source_revision_arg"
             ]
           }
         }
@@ -192,7 +192,7 @@
     },
     "artifact": {
       "type": "object",
-      "required": ["platform", "url", "sha256", "sha256_key"],
+      "required": ["platform", "url", "sha256", "sha256_arg"],
       "properties": {
         "platform": {
           "enum": ["linux/amd64", "linux/arm64"]
@@ -206,9 +206,9 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
-        "sha256_key": {
+        "sha256_arg": {
           "type": "string",
-          "pattern": "^artifacts\\.[a-z0-9_]+$"
+          "pattern": "^[A-Z][A-Z0-9_]*$"
         }
       },
       "additionalProperties": false
@@ -220,7 +220,7 @@
         "version",
         "source",
         "source_revision",
-        "source_revision_key"
+        "source_revision_arg"
       ],
       "properties": {
         "package": {
@@ -240,9 +240,9 @@
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
         },
-        "source_revision_key": {
+        "source_revision_arg": {
           "type": "string",
-          "pattern": "^sources\\.[a-z0-9_]+$"
+          "pattern": "^[A-Z][A-Z0-9_]*$"
         }
       },
       "additionalProperties": false

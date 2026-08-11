@@ -3,19 +3,18 @@
 
 from __future__ import annotations
 
-import json
 import os
 import pathlib
 import re
+
+from image_config import build_arguments, load_catalog, load_image
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def resolve_release(tag: str, checked_revision: str) -> tuple[dict[str, str], list[str]]:
-    catalog = json.loads(
-        (ROOT / "catalog/v1/images.json").read_text(encoding="utf-8")
-    )
+    catalog = load_catalog()
     if catalog["identity"]["release"] != "source_revision":
         raise ValueError("catalog is not revision-centric")
     selected = [
@@ -37,18 +36,10 @@ def resolve_release(tag: str, checked_revision: str) -> tuple[dict[str, str], li
         )
 
     config_path = ROOT / entry["config"]
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+    _, config = load_image(name, catalog)
     if config["name"] != name:
         raise ValueError("catalog and image configuration disagree")
-    if config["platforms"] != ["linux/amd64", "linux/arm64"]:
-        raise ValueError("release platform contract is not the required pair")
-
-    arguments = [
-        f"{key.upper()}={value}"
-        for section in ("base_images", "tools", "packages", "sources", "artifacts")
-        for key, value in config.get(section, {}).items()
-    ]
-    arguments.append(f"SOURCE_REVISION={revision}")
+    arguments = build_arguments(config)
     outputs = {
         "image_name": name,
         "image": entry["registry"],
@@ -59,6 +50,7 @@ def resolve_release(tag: str, checked_revision: str) -> tuple[dict[str, str], li
         ),
         "inventory_path": entry["inventory"],
         "context": str(config_path.parent.relative_to(ROOT)),
+        "platforms": ",".join(catalog["platforms"]),
     }
     return outputs, arguments
 

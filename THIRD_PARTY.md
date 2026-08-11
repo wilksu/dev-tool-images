@@ -2,39 +2,40 @@
 
 The images redistribute third-party software under its own license. The
 Apache-2.0 license for this repository does not relicense those components.
-The table below records the direct tool inputs; each published image's SBOM is
-the authoritative release-specific transitive inventory.
+The table below adds the license classification that cannot be derived from the
+build configuration. Exact versions and upstream sources live only in each
+image's machine-readable inventory; each published image's SBOM is the
+authoritative release-specific transitive inventory.
 
-| Component | Version | Upstream source | License |
-| --- | --- | --- | --- |
-| Go | 1.26.4 | `github.com/golang/go` | BSD-3-Clause |
-| Node.js | 24.18.0 | `github.com/nodejs/node` | MIT and bundled third-party notices |
-| protoc | 29.3 | `github.com/protocolbuffers/protobuf` | BSD-3-Clause |
-| gRPC Python generator | 1.68.0 | `github.com/grpc/grpc` | Apache-2.0 |
-| Protobuf compiler library (gRPC generator build) | 28.1 | `github.com/protocolbuffers/protobuf` | BSD-3-Clause |
-| Buf | 1.66.1 | `github.com/bufbuild/buf` | Apache-2.0 |
-| golangci-lint | 2.12.0 | `github.com/golangci/golangci-lint` | GPL-3.0-only |
-| protoc-gen-go | 1.36.11 | `github.com/protocolbuffers/protobuf-go` | BSD-3-Clause |
-| protoc-gen-connect-go | 1.19.1 | `github.com/connectrpc/connect-go` | Apache-2.0 |
-| protoc-gen-validate | 1.3.3 | `github.com/envoyproxy/protoc-gen-validate` | Apache-2.0 |
-| protoc-gen-doc | 1.5.1 | `github.com/pseudomuto/protoc-gen-doc` | MIT |
-| oapi-codegen | 2.6.0 | `github.com/oapi-codegen/oapi-codegen` | Apache-2.0 |
-| goimports / Go tools | 0.30.0 | `github.com/golang/tools` | BSD-3-Clause |
-| protoc-gen-es | 2.12.0 | `github.com/bufbuild/protobuf-es` | Apache-2.0 |
-| swagger-typescript-api | 13.2.16 | `github.com/acacode/swagger-typescript-api` | MIT |
-| TypeScript | 5.7.3 | `github.com/microsoft/TypeScript` | Apache-2.0 |
-| Playwright | 1.61.0 | `github.com/microsoft/playwright` | Apache-2.0 |
-| Node.js type declarations | 24.13.3 | `github.com/DefinitelyTyped/DefinitelyTyped` | MIT |
-| Bash | 5.3.9-r1 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later |
-| GCC | 15.2.0-r5 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later with runtime exception |
-| Git | 2.54.0-r0 | `gitlab.alpinelinux.org/alpine/aports` | GPL-2.0-only |
-| Make | 4.4.1-r4 | `gitlab.alpinelinux.org/alpine/aports` | GPL-3.0-or-later |
-| musl development files | 1.2.6-r2 | `gitlab.alpinelinux.org/alpine/aports` | MIT |
-| Perl | 5.42.2-r0 | `gitlab.alpinelinux.org/alpine/aports` | Artistic-1.0-Perl OR GPL-1.0-or-later |
-| Python | 3.14.5-r0 | `gitlab.alpinelinux.org/alpine/aports` | Python-2.0 |
+| Inventory component | License |
+| --- | --- |
+| `go` | BSD-3-Clause |
+| `node` | MIT and bundled third-party notices |
+| `protoc` | BSD-3-Clause |
+| `grpc-python-plugin` | Apache-2.0 |
+| `protocolbuffers/protobuf` build dependency | BSD-3-Clause |
+| `buf` | Apache-2.0 |
+| `golangci-lint` | GPL-3.0-only |
+| `protoc-gen-go` | BSD-3-Clause |
+| `protoc-gen-connect-go` | Apache-2.0 |
+| `protoc-gen-validate` | Apache-2.0 |
+| `protoc-gen-doc` | MIT |
+| `oapi-codegen` | Apache-2.0 |
+| `goimports` | BSD-3-Clause |
+| `protoc-gen-es` | Apache-2.0 |
+| `swagger-typescript-api` | MIT |
+| `typescript` | Apache-2.0 |
+| `playwright-test` | Apache-2.0 |
+| `node-types` | MIT |
+| `bash` | GPL-3.0-or-later |
+| `gcc` | GPL-3.0-or-later with runtime exception |
+| `git` | GPL-2.0-only |
+| `make` | GPL-3.0-or-later |
+| `musl-dev` | MIT |
+| `perl` | Artistic-1.0-Perl OR GPL-1.0-or-later |
+| `python3` | Python-2.0 |
 
-Exact direct versions and upstream sources are exposed through each
-`image.json` inventory and cross-checked against `package.json`,
-`package-lock.json`, and Docker build arguments. Base images and direct packages
-add transitive dependencies; consult the published SBOM before redistribution
-or policy admission.
+Npm entries are cross-checked against `package.json` and `package-lock.json`;
+Docker build arguments are generated from the same inventory. Base images and
+direct packages add transitive dependencies; consult the published SBOM before
+redistribution or policy admission.

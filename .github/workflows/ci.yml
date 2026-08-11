@@ -26,42 +26,24 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install schema validator on the hosted runner
+        run: python3 -m pip install --disable-pip-version-check --requirement requirements-ci.txt
       - name: Validate catalog and image configurations
-        run: python3 scripts/validate.py
+        run: make check
+      - id: config
+        name: Resolve build matrix from catalog
+        run: python3 scripts/image_config.py ci-matrix
+    outputs:
+      matrix: ${{ steps.config.outputs.matrix }}
 
   build-and-verify:
     name: ${{ matrix.image }} (${{ matrix.arch }})
     needs: catalog
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - image: go-contract-tools
-            fixture: contract
-            arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-24.04
-            timeout: 60
-          - image: go-contract-tools
-            fixture: contract
-            arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            timeout: 60
-          - image: playwright-client-tools
-            fixture: playwright
-            arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-24.04
-            timeout: 30
-          - image: playwright-client-tools
-            fixture: playwright
-            arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            timeout: 30
+      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
@@ -72,25 +54,7 @@ jobs:
         name: Resolve authoritative build arguments
         env:
           IMAGE: ${{ matrix.image }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-
-          image = os.environ["IMAGE"]
-          config = json.loads(pathlib.Path(f"images/{image}/image.json").read_text())
-          arguments = []
-          for section in ("base_images", "tools", "packages", "sources", "artifacts"):
-              arguments.extend(
-                  f"{key.upper()}={value}"
-                  for key, value in config.get(section, {}).items()
-              )
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write("build_args<<BUILD_ARGS\n")
-              output.write("\n".join(arguments))
-              output.write("\nBUILD_ARGS\n")
-          PY
+        run: python3 scripts/image_config.py build-args "$IMAGE"
       - name: Build native image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
@@ -104,16 +68,5 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
       - name: Verify native runtime without network or privileges
         env:
-          FIXTURE: ${{ matrix.fixture }}
           IMAGE: dev-tool-images-ci/${{ matrix.image }}:${{ github.sha }}-${{ matrix.arch }}
-          PLATFORM: ${{ matrix.platform }}
-        run: |
-          docker run --rm \
-            --platform "$PLATFORM" \
-            --network none \
-            --read-only \
-            --cap-drop ALL \
-            --security-opt no-new-privileges \
-            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
-            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
-            "$IMAGE" verify-tool-image "/src/fixtures/$FIXTURE"
+        run: scripts/verify_image.sh "$IMAGE" "${{ matrix.fixture }}" "${{ matrix.platform }}"

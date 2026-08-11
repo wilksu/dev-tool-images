@@ -8,7 +8,7 @@ test ! -e /opt/playwright-client-tools/node_modules/.cache/ms-playwright
 
 expected_playwright=$(node -p "require('/opt/playwright-client-tools/package.json').devDependencies['@playwright/test']")
 expected_typescript=$(node -p "require('/opt/playwright-client-tools/package.json').devDependencies.typescript")
-expected_node=$(node -p "require('/opt/playwright-client-tools/image.json').tools.node_version")
+expected_node=$(node -p "require('/opt/playwright-client-tools/image.json').inventory.components.find(c => c.id === 'node').version")
 test "$(node --version)" = "v$expected_node"
 test "$(playwright --version)" = "Version $expected_playwright"
 test "$(tsc --version)" = "Version $expected_typescript"
