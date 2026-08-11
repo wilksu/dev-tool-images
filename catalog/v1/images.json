@@ -8,11 +8,16 @@
     "source_revision_pattern": "^[0-9a-f]{40}$"
   },
   "inventory_schema": "catalog/v1/inventory.schema.json",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
   "images": {
     "go-contract-tools": {
       "registry": "ghcr.io/wilksu/dev-tool-images/go-contract-tools",
       "config": "images/go-contract-tools/image.json",
       "inventory": "images/go-contract-tools/image.json#inventory",
+      "fixture": "fixtures/contract",
       "release_tag_prefix": "go-contract-tools/rev-",
       "discovery_tag_prefix": "sha-"
     },
@@ -20,6 +25,7 @@
       "registry": "ghcr.io/wilksu/dev-tool-images/playwright-client-tools",
       "config": "images/playwright-client-tools/image.json",
       "inventory": "images/playwright-client-tools/image.json#inventory",
+      "fixture": "fixtures/playwright",
       "release_tag_prefix": "playwright-client-tools/rev-",
       "discovery_tag_prefix": "sha-"
     }

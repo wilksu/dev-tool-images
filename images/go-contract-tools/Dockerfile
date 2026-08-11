@@ -16,14 +16,14 @@ ENV GOBIN=/out \
     GOPROXY=https://proxy.golang.org,direct \
     GOWORK=off
 
-RUN go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}" && \
-    go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION}" && \
-    go install "google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}" && \
-    go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@${PROTOC_GEN_CONNECT_GO_VERSION}" && \
-    go install "github.com/envoyproxy/protoc-gen-validate@${PROTOC_GEN_VALIDATE_VERSION}" && \
-    go install "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@${PROTOC_GEN_DOC_VERSION}" && \
-    go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@${OAPI_CODEGEN_VERSION}" && \
-    go install "golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}"
+RUN go install "github.com/bufbuild/buf/cmd/buf@v${BUF_VERSION}" && \
+    go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_VERSION}" && \
+    go install "google.golang.org/protobuf/cmd/protoc-gen-go@v${PROTOC_GEN_GO_VERSION}" && \
+    go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@v${PROTOC_GEN_CONNECT_GO_VERSION}" && \
+    go install "github.com/envoyproxy/protoc-gen-validate@v${PROTOC_GEN_VALIDATE_VERSION}" && \
+    go install "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v${PROTOC_GEN_DOC_VERSION}" && \
+    go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v${OAPI_CODEGEN_VERSION}" && \
+    go install "golang.org/x/tools/cmd/goimports@v${GOIMPORTS_VERSION}"
 
 FROM ${NODE_BASE_IMAGE} AS protoc-tools
 
@@ -108,19 +108,9 @@ COPY --from=protoc-tools /opt/protoc/include/ /usr/local/include/
 COPY --from=grpc-python-tools /usr/local/bin/protoc-gen-grpc_python /usr/local/bin/protoc-gen-grpc_python
 COPY verify.sh /usr/local/bin/verify-tool-image
 
-ARG GO_VERSION
-ARG NODE_VERSION
-ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.title="go-contract-tools" \
       org.opencontainers.image.description="Pinned Go, Protobuf, Python gRPC, OpenAPI, and TypeScript contract toolchain" \
-      org.opencontainers.image.source="https://github.com/wilksu/dev-tool-images" \
-      org.opencontainers.image.revision="${SOURCE_REVISION}" \
-      org.opencontainers.image.licenses="Apache-2.0" \
-      io.starferry.tool.schema="2" \
-      io.starferry.tool.name="go-contract-tools" \
-      io.starferry.tool.inventory-path="images/go-contract-tools/image.json#inventory" \
-      io.starferry.tool.go-version="${GO_VERSION}" \
-      io.starferry.tool.node-version="${NODE_VERSION}"
+      org.opencontainers.image.licenses="Apache-2.0"
 
 ENV GOROOT=/usr/local/go \
     HOME=/tmp/home \

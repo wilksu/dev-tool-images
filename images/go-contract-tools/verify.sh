@@ -16,11 +16,11 @@ for command in \
 done
 
 config=/opt/go-contract-tools/image.json
-expected_buf=$(node -p "require('$config').tools.buf_version.replace(/^v/, '')")
-expected_golangci=$(node -p "require('$config').tools.golangci_version.replace(/^v/, '')")
-expected_go=$(node -p "require('$config').tools.go_version")
-expected_node=$(node -p "require('$config').tools.node_version")
-expected_protoc=$(node -p "require('$config').tools.protoc_version")
+expected_buf=$(node -p "require('$config').inventory.components.find(c => c.id === 'buf').version")
+expected_golangci=$(node -p "require('$config').inventory.components.find(c => c.id === 'golangci-lint').version")
+expected_go=$(node -p "require('$config').inventory.components.find(c => c.id === 'go').version")
+expected_node=$(node -p "require('$config').inventory.components.find(c => c.id === 'node').version")
+expected_protoc=$(node -p "require('$config').inventory.components.find(c => c.id === 'protoc').version")
 actual_buf=$(buf --version)
 actual_golangci=$(golangci-lint --version)
 actual_go=$(go version)

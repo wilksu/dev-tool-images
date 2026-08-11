@@ -1,47 +1,12 @@
 {
-  "schema": 2,
+  "schema": 3,
   "name": "go-contract-tools",
-  "platforms": [
-    "linux/amd64",
-    "linux/arm64"
-  ],
   "base_images": {
     "go_base_image": "golang:1.26.4-alpine3.23@sha256:18b460dd17542c2ba43299a633cf6ebfc1115101509531471d7cfce1019af083",
     "node_base_image": "node:24.18.0-alpine3.24@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd"
   },
-  "tools": {
-    "go_version": "1.26.4",
-    "node_version": "24.18.0",
-    "protoc_version": "29.3",
-    "grpc_python_plugin_version": "1.68.0",
-    "buf_version": "v1.66.1",
-    "golangci_version": "v2.12.0",
-    "protoc_gen_go_version": "v1.36.11",
-    "protoc_gen_connect_go_version": "v1.19.1",
-    "protoc_gen_validate_version": "v1.3.3",
-    "protoc_gen_doc_version": "v1.5.1",
-    "oapi_codegen_version": "v2.6.0",
-    "goimports_version": "v0.30.0"
-  },
-  "sources": {
-    "grpc_python_plugin_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e",
-    "grpc_python_plugin_protobuf_revision": "10ef3f77683f77fb3c059bf47725c27b3ff41e63"
-  },
-  "artifacts": {
-    "protoc_linux_amd64_sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
-    "protoc_linux_arm64_sha256": "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32"
-  },
-  "packages": {
-    "alpine_bash_version": "5.3.9-r1",
-    "alpine_gcc_version": "15.2.0-r5",
-    "alpine_git_version": "2.54.0-r0",
-    "alpine_make_version": "4.4.1-r4",
-    "alpine_musl_dev_version": "1.2.6-r2",
-    "alpine_perl_version": "5.42.2-r0",
-    "alpine_python3_version": "3.14.5-r0"
-  },
   "inventory": {
-    "schema": 1,
+    "schema": 2,
     "scope": "direct",
     "transitive_inventory": "published-sbom",
     "components": [
@@ -50,7 +15,6 @@
         "kind": "runtime",
         "package": "go",
         "version": "1.26.4",
-        "version_key": "tools.go_version",
         "source": "https://github.com/golang/go",
         "executables": ["go", "gofmt"]
       },
@@ -59,7 +23,6 @@
         "kind": "runtime",
         "package": "node",
         "version": "24.18.0",
-        "version_key": "tools.node_version",
         "source": "https://github.com/nodejs/node",
         "executables": ["node", "npm", "npx"]
       },
@@ -68,7 +31,7 @@
         "kind": "release-binary",
         "package": "protocolbuffers/protobuf",
         "version": "29.3",
-        "version_key": "tools.protoc_version",
+        "version_arg": "PROTOC_VERSION",
         "source": "https://github.com/protocolbuffers/protobuf",
         "executables": ["protoc"],
         "buf_plugins": [
@@ -80,13 +43,13 @@
             "platform": "linux/amd64",
             "url": "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip",
             "sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
-            "sha256_key": "artifacts.protoc_linux_amd64_sha256"
+            "sha256_arg": "PROTOC_LINUX_AMD64_SHA256"
           },
           {
             "platform": "linux/arm64",
             "url": "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-aarch_64.zip",
             "sha256": "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32",
-            "sha256_key": "artifacts.protoc_linux_arm64_sha256"
+            "sha256_arg": "PROTOC_LINUX_ARM64_SHA256"
           }
         ]
       },
@@ -95,10 +58,10 @@
         "kind": "source-build",
         "package": "grpc/grpc",
         "version": "1.68.0",
-        "version_key": "tools.grpc_python_plugin_version",
+        "version_arg": "GRPC_PYTHON_PLUGIN_VERSION",
         "source": "https://github.com/grpc/grpc",
         "source_revision": "6b49ae626bc9cd7033e062f89dbe0e0576b1110e",
-        "source_revision_key": "sources.grpc_python_plugin_revision",
+        "source_revision_arg": "GRPC_PYTHON_PLUGIN_REVISION",
         "executables": ["protoc-gen-grpc_python"],
         "buf_plugins": ["buf.build/grpc/python:v1.68.0"],
         "build_dependencies": [
@@ -107,7 +70,7 @@
             "version": "28.1",
             "source": "https://github.com/protocolbuffers/protobuf",
             "source_revision": "10ef3f77683f77fb3c059bf47725c27b3ff41e63",
-            "source_revision_key": "sources.grpc_python_plugin_protobuf_revision"
+            "source_revision_arg": "GRPC_PYTHON_PLUGIN_PROTOBUF_REVISION"
           }
         ]
       },
@@ -117,7 +80,7 @@
         "package": "github.com/bufbuild/buf",
         "install_target": "github.com/bufbuild/buf/cmd/buf",
         "version": "1.66.1",
-        "version_key": "tools.buf_version",
+        "version_arg": "BUF_VERSION",
         "source": "https://github.com/bufbuild/buf",
         "executables": ["buf"]
       },
@@ -127,7 +90,7 @@
         "package": "github.com/golangci/golangci-lint/v2",
         "install_target": "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
         "version": "2.12.0",
-        "version_key": "tools.golangci_version",
+        "version_arg": "GOLANGCI_VERSION",
         "source": "https://github.com/golangci/golangci-lint",
         "executables": ["golangci-lint"]
       },
@@ -137,7 +100,7 @@
         "package": "google.golang.org/protobuf",
         "install_target": "google.golang.org/protobuf/cmd/protoc-gen-go",
         "version": "1.36.11",
-        "version_key": "tools.protoc_gen_go_version",
+        "version_arg": "PROTOC_GEN_GO_VERSION",
         "source": "https://github.com/protocolbuffers/protobuf-go",
         "executables": ["protoc-gen-go"]
       },
@@ -147,7 +110,7 @@
         "package": "connectrpc.com/connect",
         "install_target": "connectrpc.com/connect/cmd/protoc-gen-connect-go",
         "version": "1.19.1",
-        "version_key": "tools.protoc_gen_connect_go_version",
+        "version_arg": "PROTOC_GEN_CONNECT_GO_VERSION",
         "source": "https://github.com/connectrpc/connect-go",
         "executables": ["protoc-gen-connect-go"]
       },
@@ -157,7 +120,7 @@
         "package": "github.com/envoyproxy/protoc-gen-validate",
         "install_target": "github.com/envoyproxy/protoc-gen-validate",
         "version": "1.3.3",
-        "version_key": "tools.protoc_gen_validate_version",
+        "version_arg": "PROTOC_GEN_VALIDATE_VERSION",
         "source": "https://github.com/envoyproxy/protoc-gen-validate",
         "executables": ["protoc-gen-validate"]
       },
@@ -167,7 +130,7 @@
         "package": "github.com/pseudomuto/protoc-gen-doc",
         "install_target": "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc",
         "version": "1.5.1",
-        "version_key": "tools.protoc_gen_doc_version",
+        "version_arg": "PROTOC_GEN_DOC_VERSION",
         "source": "https://github.com/pseudomuto/protoc-gen-doc",
         "executables": ["protoc-gen-doc"]
       },
@@ -177,7 +140,7 @@
         "package": "github.com/oapi-codegen/oapi-codegen/v2",
         "install_target": "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen",
         "version": "2.6.0",
-        "version_key": "tools.oapi_codegen_version",
+        "version_arg": "OAPI_CODEGEN_VERSION",
         "source": "https://github.com/oapi-codegen/oapi-codegen",
         "executables": ["oapi-codegen"]
       },
@@ -187,7 +150,7 @@
         "package": "golang.org/x/tools",
         "install_target": "golang.org/x/tools/cmd/goimports",
         "version": "0.30.0",
-        "version_key": "tools.goimports_version",
+        "version_arg": "GOIMPORTS_VERSION",
         "source": "https://github.com/golang/tools",
         "executables": ["goimports"]
       },
@@ -223,7 +186,7 @@
         "kind": "alpine-package",
         "package": "bash",
         "version": "5.3.9-r1",
-        "version_key": "packages.alpine_bash_version",
+        "version_arg": "ALPINE_BASH_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -231,7 +194,7 @@
         "kind": "alpine-package",
         "package": "gcc",
         "version": "15.2.0-r5",
-        "version_key": "packages.alpine_gcc_version",
+        "version_arg": "ALPINE_GCC_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -239,7 +202,7 @@
         "kind": "alpine-package",
         "package": "git",
         "version": "2.54.0-r0",
-        "version_key": "packages.alpine_git_version",
+        "version_arg": "ALPINE_GIT_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -247,7 +210,7 @@
         "kind": "alpine-package",
         "package": "make",
         "version": "4.4.1-r4",
-        "version_key": "packages.alpine_make_version",
+        "version_arg": "ALPINE_MAKE_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -255,7 +218,7 @@
         "kind": "alpine-package",
         "package": "musl-dev",
         "version": "1.2.6-r2",
-        "version_key": "packages.alpine_musl_dev_version",
+        "version_arg": "ALPINE_MUSL_DEV_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -263,7 +226,7 @@
         "kind": "alpine-package",
         "package": "perl",
         "version": "5.42.2-r0",
-        "version_key": "packages.alpine_perl_version",
+        "version_arg": "ALPINE_PERL_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
       {
@@ -271,7 +234,7 @@
         "kind": "alpine-package",
         "package": "python3",
         "version": "3.14.5-r0",
-        "version_key": "packages.alpine_python3_version",
+        "version_arg": "ALPINE_PYTHON3_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports",
         "executables": ["python3"]
       }
