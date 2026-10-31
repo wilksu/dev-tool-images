@@ -19,6 +19,6 @@ exec docker run --rm "$@" \
   --read-only \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+  --tmpfs /tmp:rw,exec,nosuid,nodev,size=256m \
   --mount "type=bind,src=${GITHUB_WORKSPACE:-$(pwd)},dst=/src,readonly" \
   "$image" verify-tool-image "/src/$fixture"
