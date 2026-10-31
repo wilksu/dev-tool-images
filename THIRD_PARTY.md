@@ -15,6 +15,7 @@ authoritative release-specific transitive inventory.
 | `grpc-python-plugin` | Apache-2.0 |
 | `protocolbuffers/protobuf` build dependency | BSD-3-Clause |
 | `buf` | Apache-2.0 |
+| `controller-gen` | Apache-2.0 |
 | `golangci-lint` | GPL-3.0-only |
 | `protoc-gen-go` | BSD-3-Clause |
 | `protoc-gen-connect-go` | Apache-2.0 |

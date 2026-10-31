@@ -85,6 +85,16 @@
         "executables": ["buf"]
       },
       {
+        "id": "controller-gen",
+        "kind": "go-module",
+        "package": "sigs.k8s.io/controller-tools",
+        "install_target": "sigs.k8s.io/controller-tools/cmd/controller-gen",
+        "version": "0.20.0",
+        "version_arg": "CONTROLLER_GEN_VERSION",
+        "source": "https://github.com/kubernetes-sigs/controller-tools",
+        "executables": ["controller-gen"]
+      },
+      {
         "id": "golangci-lint",
         "kind": "go-module",
         "package": "github.com/golangci/golangci-lint/v2",
@@ -217,7 +227,7 @@
         "id": "musl-dev",
         "kind": "alpine-package",
         "package": "musl-dev",
-        "version": "1.2.6-r2",
+        "version": "1.2.6-r3",
         "version_arg": "ALPINE_MUSL_DEV_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
@@ -225,7 +235,7 @@
         "id": "perl",
         "kind": "alpine-package",
         "package": "perl",
-        "version": "5.42.2-r0",
+        "version": "5.42.2-r1",
         "version_arg": "ALPINE_PERL_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
@@ -233,7 +243,7 @@
         "id": "python3",
         "kind": "alpine-package",
         "package": "python3",
-        "version": "3.14.5-r0",
+        "version": "3.14.10-r1",
         "version_arg": "ALPINE_PYTHON3_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports",
         "executables": ["python3"]

@@ -4,6 +4,7 @@ ARG NODE_BASE_IMAGE=scratch
 FROM ${GO_BASE_IMAGE} AS go-tools
 
 ARG BUF_VERSION
+ARG CONTROLLER_GEN_VERSION
 ARG GOLANGCI_VERSION
 ARG OAPI_CODEGEN_VERSION
 ARG PROTOC_GEN_GO_VERSION
@@ -17,6 +18,7 @@ ENV GOBIN=/out \
     GOWORK=off
 
 RUN go install "github.com/bufbuild/buf/cmd/buf@v${BUF_VERSION}" && \
+    go install "sigs.k8s.io/controller-tools/cmd/controller-gen@v${CONTROLLER_GEN_VERSION}" && \
     go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_VERSION}" && \
     go install "google.golang.org/protobuf/cmd/protoc-gen-go@v${PROTOC_GEN_GO_VERSION}" && \
     go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@v${PROTOC_GEN_CONNECT_GO_VERSION}" && \
