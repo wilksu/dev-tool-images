@@ -85,6 +85,16 @@
         "executables": ["buf"]
       },
       {
+        "id": "controller-gen",
+        "kind": "go-module",
+        "package": "sigs.k8s.io/controller-tools",
+        "install_target": "sigs.k8s.io/controller-tools/cmd/controller-gen",
+        "version": "0.20.0",
+        "version_arg": "CONTROLLER_GEN_VERSION",
+        "source": "https://github.com/kubernetes-sigs/controller-tools",
+        "executables": ["controller-gen"]
+      },
+      {
         "id": "golangci-lint",
         "kind": "go-module",
         "package": "github.com/golangci/golangci-lint/v2",

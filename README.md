@@ -8,7 +8,7 @@ consumers accept immutable OCI digests instead of rebuilding these toolchains.
 
 | Logical name | Purpose | Browser binaries |
 | --- | --- | --- |
-| `go-contract-tools` | Go, Buf, Protobuf/Python gRPC, OpenAPI, and TypeScript contract generation and quality tools | N/A |
+| `go-contract-tools` | Go, controller-gen, Buf, Protobuf/Python gRPC, OpenAPI, and TypeScript generation and quality tools | N/A |
 | `playwright-client-tools` | Playwright client, Node types, and TypeScript for browserless test discovery and execution | No |
 
 The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json),
@@ -79,7 +79,7 @@ make verify IMAGE=playwright-client-tools
 
 Verification runs without network access, with a read-only root filesystem,
 without Linux capabilities, and with `no-new-privileges`. The contract fixture
-exercises Buf lint/generation, Go and Connect generators, the ES generator,
+exercises controller-gen DeepCopy generation, Buf lint/generation, Go and Connect generators, the ES generator,
 protoc Python/typing generation, the gRPC Python generator, both OpenAPI
 generators, Go build/vet/lint, and TypeScript. The Playwright
 fixture proves client loading, type checking, and test discovery without
