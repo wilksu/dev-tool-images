@@ -174,6 +174,15 @@
         "executables": ["protoc-gen-es"]
       },
       {
+        "id": "prettier",
+        "kind": "npm-package",
+        "package": "prettier",
+        "version": "3.8.3",
+        "manifest": "package.json#dependencies",
+        "source": "https://github.com/prettier/prettier",
+        "executables": ["prettier"]
+      },
+      {
         "id": "swagger-typescript-api",
         "kind": "npm-package",
         "package": "swagger-typescript-api",

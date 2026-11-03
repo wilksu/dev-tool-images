@@ -5,7 +5,7 @@ fixture=${1:?usage: verify-tool-image FIXTURE_DIRECTORY}
 test -d "$fixture"
 
 for command in \
-  buf controller-gen go golangci-lint goimports oapi-codegen protoc \
+  buf controller-gen go golangci-lint goimports oapi-codegen prettier protoc \
   protoc-gen-connect-go protoc-gen-doc protoc-gen-es \
   protoc-gen-go protoc-gen-grpc_python protoc-gen-validate \
   swagger-typescript-api tsc; do
@@ -21,12 +21,14 @@ expected_controller_gen=$(node -p "require('$config').inventory.components.find(
 expected_golangci=$(node -p "require('$config').inventory.components.find(c => c.id === 'golangci-lint').version")
 expected_go=$(node -p "require('$config').inventory.components.find(c => c.id === 'go').version")
 expected_node=$(node -p "require('$config').inventory.components.find(c => c.id === 'node').version")
+expected_prettier=$(node -p "require('$config').inventory.components.find(c => c.id === 'prettier').version")
 expected_protoc=$(node -p "require('$config').inventory.components.find(c => c.id === 'protoc').version")
 actual_buf=$(buf --version)
 actual_controller_gen=$(controller-gen --version)
 actual_golangci=$(golangci-lint --version)
 actual_go=$(go version)
 actual_node=$(node --version)
+actual_prettier=$(prettier --version)
 actual_protoc=$(protoc --version)
 test "$actual_buf" = "$expected_buf" || {
   printf 'buf version mismatch: expected %s, got %s\n' "$expected_buf" "$actual_buf" >&2
@@ -66,6 +68,11 @@ test "$actual_node" = "v$expected_node" || {
   printf 'Node version mismatch: expected %s, got %s\n' "$expected_node" "$actual_node" >&2
   exit 1
 }
+test "$actual_prettier" = "$expected_prettier" || {
+  printf 'Prettier version mismatch: expected %s, got %s\n' "$expected_prettier" "$actual_prettier" >&2
+  exit 1
+}
+printf 'Prettier %s\n' "$actual_prettier"
 test "$actual_protoc" = "libprotoc $expected_protoc" || {
   printf 'protoc version mismatch: expected %s, got %s\n' "$expected_protoc" "$actual_protoc" >&2
   exit 1
@@ -113,3 +120,9 @@ go build ./cmd/check
 golangci-lint run ./cmd/check/...
 printf '%s\n' 'verifying TypeScript'
 tsc --noEmit --project tsconfig.json
+printf '%s\n' 'verifying Prettier formatting'
+formatted=$(printf 'const value={a:1};\n' | prettier --parser typescript)
+test "$formatted" = 'const value = { a: 1 };' || {
+  printf 'unexpected Prettier output: %s\n' "$formatted" >&2
+  exit 1
+}

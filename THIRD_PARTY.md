@@ -24,6 +24,7 @@ authoritative release-specific transitive inventory.
 | `oapi-codegen` | Apache-2.0 |
 | `goimports` | BSD-3-Clause |
 | `protoc-gen-es` | Apache-2.0 |
+| `prettier` | MIT |
 | `swagger-typescript-api` | MIT |
 | `typescript` | Apache-2.0 |
 | `playwright-test` | Apache-2.0 |
