@@ -1,0 +1,58 @@
+name: Android image probe
+
+on:
+  push:
+    branches:
+      - codex/android-image-probe
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-image-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # cimg/android:2026.11-ndk, linux/amd64
+      CANDIDATE: docker.io/cimg/android@sha256:df6bee6ca4ef78787c97bc56ee7a44d3e6e6253a7e8534d30c3c46feba5a723d
+      PROBE_IMAGE: android-go-probe:ci
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Pull candidate and add verified Go toolchain
+        run: |
+          echo "Base image: $CANDIDATE"
+          docker buildx build --platform linux/amd64 --load --tag "$PROBE_IMAGE" \
+            --build-arg "ANDROID_BASE_IMAGE=$CANDIDATE" experiments/android-image
+          docker image inspect --format 'Uncompressed image bytes: {{.Size}}' "$PROBE_IMAGE"
+      - name: Verify JDK, SDK, and both Android cgo targets offline
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --tmpfs /tmp:rw,exec,nosuid,nodev,size=768m \
+            --mount "type=bind,src=$PWD/experiments/android-image,dst=/probe,readonly" \
+            "$PROBE_IMAGE" sh /probe/verify-native.sh
+      - name: Build and lint a minimal API 37 app with AGP 9.3.1
+        run: |
+          gradle_dir=$(mktemp -d)
+          curl -fsSL --retry 2 --max-time 120 \
+            https://downloads.gradle.org/distributions/gradle-9.9.1-bin.zip \
+            -o "$gradle_dir/gradle.zip"
+          (
+            cd "$gradle_dir"
+            echo 'd8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228  gradle.zip' | sha256sum -c -
+            unzip -q gradle.zip
+          )
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,src=$gradle_dir/gradle-9.9.1,dst=/opt/probe-gradle,readonly" \
+            --mount "type=bind,src=$PWD/experiments/android-image/gradle,dst=/fixture,readonly" \
+            --env GRADLE_USER_HOME=/tmp/gradle-home "$PROBE_IMAGE" sh -eu -c '
+              cp -R /fixture /tmp/android-probe
+              cd /tmp/android-probe
+              /opt/probe-gradle/bin/gradle --no-daemon --console=plain assembleDebug lintDebug
+              test -s build/outputs/apk/debug/android-image-probe-debug.apk
+            '
