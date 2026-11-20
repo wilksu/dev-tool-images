@@ -62,4 +62,5 @@ ENV ANDROID_HOME=/opt/android-sdk \
     PATH=/opt/go/bin:${PATH}
 ENV ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_REVISION}
 LABEL org.opencontainers.image.title="android-go-tools" \
+      org.opencontainers.image.source="https://github.com/wilksu/dev-tool-images" \
       org.opencontainers.image.description="Pinned Android and Go development tools for Linux amd64"

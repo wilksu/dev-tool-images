@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - codex/android-go-tools
+    tags:
+      - 'android-go-tools/rev-*'
 
 permissions:
   contents: read
@@ -16,6 +18,9 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 18
+    permissions:
+      contents: read
+      packages: write
     env:
       BUILDKIT_IMAGE: moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
       IMAGE: android-go-tools:verification
@@ -28,7 +33,12 @@ jobs:
           driver-opts: |
             image=${{ env.BUILDKIT_IMAGE }}
       - name: Build pinned Linux amd64 image
-        run: python3 images/android-go-tools/build.py --tag "$IMAGE" --oci "$RUNNER_TEMP/android-oci"
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test "$GITHUB_REF_NAME" = "android-go-tools/rev-$GITHUB_SHA"
+          fi
+          python3 images/android-go-tools/build.py --tag "$IMAGE" \
+            --oci "$RUNNER_TEMP/android-oci" --revision "$GITHUB_SHA"
       - name: Warm Gradle and build the fixture again with networking disabled
         shell: bash
         run: |
@@ -60,6 +70,29 @@ jobs:
             unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libprobe.so"
           done
       - name: Compare OCI layers after changing only Go or the SDK platform
+        if: github.ref_type == 'branch'
         run: >-
           python3 fixtures/android-go/compare-layers.py
           images/android-go-tools/build.py "$RUNNER_TEMP/android-oci"
+      - name: Publish the verified OCI manifest to GHCR
+        if: github.ref_type == 'tag'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/android-go-tools"
+          tag="sha-$GITHUB_SHA"
+          layout="$RUNNER_TEMP/android-oci"
+          auth="$RUNNER_TEMP/ghcr-auth.json"
+          trap 'rm -f "$auth"' EXIT
+
+          printf '%s' "$GHCR_TOKEN" | skopeo login --authfile "$auth" \
+            --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          skopeo copy --preserve-digests --retry-times 3 --dest-authfile "$auth" \
+            --digestfile "$RUNNER_TEMP/android-digest" "oci:$layout" "docker://$image:$tag"
+          digest=$(cat "$RUNNER_TEMP/android-digest")
+          test "$digest" = "$(jq -er '.manifests[0].digest' "$layout/index.json")"
+          alias=$(skopeo inspect --authfile "$auth" --no-tags --format '{{.Digest}}' "docker://$image:$tag")
+          test "$digest" = "$alias"
+          reference="$image@$digest"
+          size=$(jq '[.layers[].size] | add' "$layout/blobs/sha256/${digest#sha256:}")
+          printf 'Image: \u0060%s\u0060\n\nCompressed layer bytes: %s\n' "$reference" "$size" | tee -a "$GITHUB_STEP_SUMMARY"

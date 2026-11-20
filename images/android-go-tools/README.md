@@ -39,7 +39,7 @@ with those caches, add `--network none -e GOPROXY=off` before the image
 reference and `--offline` to the Gradle command. Install the resulting
 APK from the host with `adb`.
 
-## Remote verification and distribution
+## Remote verification and release
 
 The verification workflow builds a container on GitHub Actions. It warms
 the fixture's Gradle cache, repeats compilation with networking disabled,
@@ -48,11 +48,16 @@ compares OCI layers after changing only Go or SDK Platform. The reported
 incremental byte counts sum the compressed descriptors for layers absent
 from a warm client.
 
-Google lists these SDK and NDK archives under the Android SDK License
-Agreement. Section 3.4 restricts redistribution and section 3.5 gives the
-applicable open-source licenses control of their components. Verification
-uses the image on a single runner. Confirm permission for the exact archive
-contents and target registry before distributing the bundled image.
+A Git tag named `android-go-tools/rev-<full-commit-sha>` verifies and
+publishes that revision to `ghcr.io/wilksu/dev-tool-images/android-go-tools`.
+The workflow copies the verified OCI image with its manifest digest preserved.
+The `sha-<full-commit-sha>` registry tag is a discovery handle. Pin the digest
+from the workflow summary when using the image.
+
+The image retains the component notices provided in the Android tool archives.
+Google lists these archives under the Android SDK License Agreement, which
+describes both the SDK distribution terms and the applicable open-source terms
+for individual components.
 
 [Android SDK terms](https://developer.android.com/studio#terms-and-conditions) ·
 [NDK download and terms](https://developer.android.com/ndk/downloads)

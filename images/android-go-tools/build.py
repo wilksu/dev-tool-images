@@ -4,6 +4,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -13,9 +14,12 @@ def main():
     parser.add_argument("--config", type=Path)
     parser.add_argument("--tag")
     parser.add_argument("--oci", type=Path)
+    parser.add_argument("--revision")
     args = parser.parse_args()
     if not (args.tag or args.oci):
         parser.error("choose --tag, --oci, or both")
+    if args.revision and not re.fullmatch(r"[0-9a-f]{40}", args.revision):
+        parser.error("--revision must be a full Git commit SHA")
 
     image_dir = Path(__file__).resolve().parent
     inventory_path = args.config or image_dir / "image.json"
@@ -35,6 +39,8 @@ def main():
         command.extend(["--load", "--tag", args.tag])
     if args.oci:
         command.extend(["--output", f"type=oci,tar=false,dest={args.oci}"])
+    if args.revision:
+        command.extend(["--label", f"org.opencontainers.image.revision={args.revision}"])
     for name, value in inputs.items():
         command.extend(["--build-arg", f"{name}={value}"])
 

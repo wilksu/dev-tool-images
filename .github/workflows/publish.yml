@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - '*/rev-*'
+      - '!android-go-tools/rev-*'
 
 permissions:
   contents: read
