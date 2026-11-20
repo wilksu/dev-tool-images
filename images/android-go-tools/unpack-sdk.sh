@@ -25,6 +25,6 @@ set -- extracted/*
 test "$#" -eq 1
 installed_revision=$(sed -n 's/^Pkg\.Revision[[:space:]]*=[[:space:]]*//p' "$1/source.properties" | tr -d '\r')
 test "$installed_revision" = "$revision"
-cp "/opt/sdk-metadata/$package_dir.xml" "$1/package.xml"
+cp /opt/package.xml "$1/package.xml"
 mkdir -p "$(dirname "$destination")"
 mv "$1" "$destination"

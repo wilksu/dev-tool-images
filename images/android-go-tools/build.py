@@ -22,9 +22,12 @@ def main():
     inventory = json.loads(inventory_path.read_text())
     inputs = {"JDK_BASE_IMAGE": inventory["jdk"]["image"]}
     for component in ("go", "android_platform", "build_tools", "ndk"):
+        prefix = component.upper()
         for key in ("url", "sha256", "sha1", "package", "revision"):
             if key in inventory[component]:
-                inputs[f"{component.upper()}_{key.upper()}"] = inventory[component][key]
+                inputs[f"{prefix}_{key.upper()}"] = inventory[component][key]
+        if package := inventory[component].get("package"):
+            inputs[f"{prefix}_METADATA"] = package.replace(";", "/") + ".xml"
 
     command = ["docker", "buildx", "build", "--platform", inventory["platform"],
                "--progress=plain", "--provenance=false"]

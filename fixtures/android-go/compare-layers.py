@@ -49,9 +49,9 @@ def main():
             changed = variant_manifest["layers"]
             component_offset = -2 if component == "go" else -3
             assert len(changed) == len(baseline)
-            for index, (old, new) in enumerate(zip(baseline, changed)):
-                expected_change = index in (len(baseline) - 1, len(baseline) + component_offset)
-                assert (old["digest"] != new["digest"]) == expected_change, (component, index)
+            differences = [index - len(baseline) for index, (old, new) in
+                           enumerate(zip(baseline, changed)) if old["digest"] != new["digest"]]
+            assert differences == [component_offset, -1], (component, differences)
             missing_bytes = sum(layer["size"] for layer in changed
                                 if layer["digest"] not in baseline_digests)
             print(f"{component}: unchanged NDK {changed[-5]['digest']}", flush=True)
