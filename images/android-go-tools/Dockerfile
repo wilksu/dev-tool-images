@@ -5,6 +5,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends unzip && \
     rm -rf /var/lib/apt/lists/*
 COPY unpack-sdk.sh /usr/local/bin/unpack-sdk
+COPY sdk-metadata/ /opt/sdk-metadata/
 
 FROM ${JDK_BASE_IMAGE} AS go
 ARG GO_URL

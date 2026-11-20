@@ -6,7 +6,8 @@ sha1=$2
 sha256=$3
 package=$4
 revision=$5
-destination="/out/$(printf '%s' "$package" | tr ';' '/')"
+package_dir=$(printf '%s' "$package" | tr ';' '/')
+destination="/out/$package_dir"
 
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
@@ -24,5 +25,6 @@ set -- extracted/*
 test "$#" -eq 1
 installed_revision=$(sed -n 's/^Pkg\.Revision[[:space:]]*=[[:space:]]*//p' "$1/source.properties" | tr -d '\r')
 test "$installed_revision" = "$revision"
+cp "/opt/sdk-metadata/$package_dir.xml" "$1/package.xml"
 mkdir -p "$(dirname "$destination")"
 mv "$1" "$destination"
