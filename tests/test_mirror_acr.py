@@ -13,6 +13,55 @@ from mirror_acr import Image, Registry, manifest_digest, read_images, source_dig
 
 
 class MirrorTests(unittest.TestCase):
+    def test_throttling_retries_with_backoff_but_authentication_does_not(self):
+        throttled = subprocess.CompletedProcess([], 1, b"", b"TOOMANYREQUESTS: concurrent operation limit")
+        success = subprocess.CompletedProcess([], 0, b"{}", b"")
+        denied = subprocess.CompletedProcess([], 1, b"", b"unauthorized: invalid credentials")
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        with patch("subprocess.run", side_effect=[throttled, throttled, success]) as run, patch("time.sleep") as sleep:
+            self.assertEqual(registry.run("inspect").returncode, 0)
+            self.assertEqual(run.call_count, 3)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertLess(sleep.call_args_list[0].args[0], sleep.call_args_list[1].args[0])
+        with patch("subprocess.run", return_value=denied) as run, patch("time.sleep") as sleep:
+            self.assertEqual(registry.run("login").returncode, 1)
+            run.assert_called_once()
+            sleep.assert_not_called()
+
+    def test_retry_budget_is_bounded_and_timeouts_retry(self):
+        failure = subprocess.CompletedProcess([], 1, b"", b"503 Service Unavailable")
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        with patch("subprocess.run", return_value=failure) as run, patch("time.sleep"):
+            self.assertEqual(registry.run("copy").returncode, 1)
+            self.assertEqual(run.call_count, 4)
+        with patch("subprocess.run", side_effect=[subprocess.TimeoutExpired("skopeo", 1), subprocess.CompletedProcess([], 0, b"{}", b"")]) as run, patch("time.sleep"):
+            self.assertEqual(registry.run("inspect").returncode, 0)
+            self.assertEqual(run.call_count, 2)
+
+    def test_pinned_sources_keep_digest_and_remove_tag_for_skopeo(self):
+        digest = "sha256:" + "a" * 64
+        for source in (f"docker.io/library/redis:7.4-alpine@{digest}", f"docker.io/library/redis@{digest}"):
+            with self.subTest(source=source):
+                image = Image(source, "redis:7.4-alpine")
+                self.assertEqual(image.repository, "docker.io/library/redis")
+                self.assertEqual(image.pull_reference, f"docker.io/library/redis@{digest}")
+                registry = Mock()
+                registry.inspect.side_effect = [None, digest, digest]
+                synchronize(image, "acr/ns", registry)
+                self.assertEqual(registry.inspect.call_args_list[1].args, (f"docker.io/library/redis@{digest}",))
+        image = Image("registry.example:5000/ns/image:tag", "image:tag")
+        self.assertEqual(image.repository, "registry.example:5000/ns/image")
+        self.assertEqual(image.pull_reference, image.source)
+
+    def test_existing_pinned_mirror_does_not_require_upstream_access(self):
+        digest = "sha256:" + "a" * 64
+        registry = Mock()
+        registry.inspect.return_value = digest
+        image = Image(f"docker.io/library/redis:7.4-alpine@{digest}", "redis:7.4-alpine")
+        self.assertEqual(synchronize(image, "acr/ns", registry), ("unchanged", digest))
+        registry.inspect.assert_called_once_with("acr/ns/redis:7.4-alpine", destination=True)
+        registry.copy.assert_not_called()
+
     def test_single_platform_attestation_index_uses_the_runtime_digest(self):
         runtime = {"digest": "sha256:" + "a" * 64, "platform": {"os": "linux", "architecture": "amd64"}}
         attestation = {"digest": "sha256:" + "b" * 64, "annotations": {"vnd.docker.reference.type": "attestation-manifest"}}

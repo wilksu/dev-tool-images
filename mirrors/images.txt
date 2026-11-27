@@ -1,3 +1,56 @@
-# Source image                                               ACR repository:tag
-docker.io/mattermost/mattermost-team-edition:latest           mattermost:latest
-docker.io/library/nginx:latest                               nginx:latest
+# Source image (tag and/or digest)    ACR repository:tag
+# All entries are pinned snapshots. Updating a version requires editing this file.
+# Flatten upstream paths because ACR repository names cannot contain slashes.
+
+docker.io/mattermost/mattermost-team-edition:latest@sha256:35927b9c535a9eb74f0e45385d3fe5d8308b16e0464031f157a834da8af3ee73  mattermost:latest  # Previously requested latest tracking
+docker.io/library/nginx:latest@sha256:6a3df739b6312289e87d70947d900669c1b3087474ece5814b9c01bbf2e6dde3  nginx:latest  # Previously requested latest tracking
+docker.io/pgvector/pgvector:0.8.5-pg17@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0  pgvector:0.8.5-pg17  # scripts/tool-versions.env
+docker.io/arigaio/atlas:1.3.0-community@sha256:57f5560604d8a9595eb2bbd91177a2455e33143842c5691e6cde2fa2c6f1a226  atlas:1.3.0-community  # scripts/tool-versions.env
+docker.io/library/redis:7.4-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf  redis:7.4-alpine  # deploy/release-contract.json
+docker.io/library/rabbitmq:4.0-management-alpine@sha256:35b2a11a4731c3a5346080722a3f5279ecf674aab32239b9ec59141473825133  rabbitmq:4.0-management-alpine  # deploy/release-contract.json
+docker.m.daocloud.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e  minio:RELEASE.2025-09-07T16-13-09Z  # exact project digest retained in DaoCloud cache; original registry returns 401
+docker.io/casbin/casdoor:3.98.0@sha256:7b7ba21d611775b5fabd0829616f060b14c0f1537ed897f7a571e6c48624ed55  casdoor:3.98.0  # deploy/release-contract.json
+docker.io/library/traefik:v3.7.5@sha256:e4d98158c01ad752fc1071d4e9573788747230d902cdde00a772516e692d07c9  traefik:v3.7.5  # deploy/release-contract.json
+docker.io/calciumion/new-api@sha256:428018a37c0b26c163a3367c18401161707cd0e08d0f26a3dde9ff0caa05e34c  new-api:sha-428018a37c0b  # deploy/release-contract.json
+docker.io/andyshinn/dnsmasq:2.83@sha256:e937327fede666e55ba4c2ab8e715a2ce561945363016d42f9d698d1b18ff1be  dnsmasq:2.83  # dev/docker-compose.shared.yml
+docker.io/pgvector/pgvector:0.8.4-pg17@sha256:dd467f03ca5c5581222490e5217e48a262864ccb659be559f8491bbafdc97da0  pgvector:0.8.4-pg17  # dev/docker-compose.shared.yml
+ghcr.io/browserless/chromium@sha256:50edafe9b66376e02ea4aaef75c540700b3e13a1ed3bf1a268fd8487e8c0c97f  browserless-chromium:sha-50edafe9b663  # dev/docker-compose.shared.yml
+docker.io/mattermost/mattermost-team-edition:11.7.10@sha256:84a041d836bf6fbf6a9a78ab699fa5ebe5437bfb6a514b5afad4121fa3800696  mattermost:11.7.10  # dev/docker-compose.shared.yml
+docker.io/prom/prometheus:v3.0.1@sha256:565ee86501224ebbb98fc10b332fa54440b100469924003359edf49cbce374bd  prometheus:v3.0.1  # docker-compose.yml
+docker.io/jaegertracing/all-in-one:1.72.0@sha256:144b7028db6045b28b50c4728dd3bea14fa76ab024b64afeccec51c8cb1edd63  jaeger:1.72.0  # dev/docker-compose.shared.yml
+docker.io/grafana/loki:3.3.2@sha256:8af2de1abbdd7aa92b27c9bcc96f0f4140c9096b507c77921ffddf1c6ad6c48f  loki:3.3.2  # docker-compose.yml
+docker.io/grafana/grafana-oss:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb  grafana:11.4.0  # docker-compose.yml
+docker.io/grafana/promtail:3.3.2@sha256:cb4990801ec58975c5e231057c2bcf204c85fac428eec65ad66e0016c64b9608  promtail:3.3.2  # docker-compose.yml
+docker.io/prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5  alertmanager:v0.27.0  # docker-compose.yml
+docker.io/cloudflare/cloudflared:2026.6.1@sha256:95de18ccf4e51bd9d2ba28fe7218e423adc6a88fad1aee910eb67c306b7af2c4  cloudflared:2026.6.1  # scripts/tool-versions.env
+docker.io/jaegertracing/all-in-one:1.76.0@sha256:ab6f1a1f0fb49ea08bcd19f6b84f6081d0d44b364b6de148e1798eb5816bacac  jaeger:1.76.0  # docker-compose.yml
+docker.io/oliver006/redis_exporter:v1.63.0@sha256:8dde0136b66ec4dfb25802283fe89852a405368b095b3893841d90499a8d4e17  redis-exporter:v1.63.0  # docker-compose.yml
+docker.io/prometheuscommunity/postgres-exporter:v0.15.0@sha256:386b12d19eab2a37d7cd8ca8b4c7491cc7a830d9581f49af6c98a393da9605e6  postgres-exporter:v0.15.0  # docker-compose.yml
+docker.io/library/nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46  nginx:1.30.4-alpine  # frontend/Dockerfile
+docker.io/mattermost/mattermost-enterprise-edition:11.9.0@sha256:c4d8b6c07784849c168ec694ba5f100923bcd5c320b19ade23eb3b6cc04fda91  mattermost-enterprise:11.9.0  # tests/e2e/fixtures/mattermost-mcp/compose.yml
+ghcr.io/dexidp/dex@sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462  dex:sha-8499afd690c4  # tests/e2e/fixtures/oidc-dex/compose.yml
+docker.io/library/postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73  postgres:17-alpine  # deploy/kubernetes/01-infrastructure.yaml
+docker.io/pgvector/pgvector:pg17@sha256:b513c48566e4777cd3370451400000c78eda6a08131d68f4c31d4a76f27bd8fd  pgvector:pg17  # deploy/helm/values.yaml
+docker.io/library/alpine:latest@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf  alpine:latest  # debug.yaml
+docker.io/library/node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd  node:24-alpine  # scripts/tool-versions.env
+docker.io/library/docker:27.5.1-cli-alpine3.21@sha256:f56779b4e86550493153cc8642c9c8e40b5d934e43cb5b4ea463aea5245c5c01  docker:27.5.1-cli-alpine3.21  # scripts/tool-versions.env
+docker.io/library/golang:1.26.4-alpine3.23@sha256:18b460dd17542c2ba43299a633cf6ebfc1115101509531471d7cfce1019af083  golang:1.26.4-alpine3.23  # scripts/tool-versions.env
+docker.io/library/python:3.12.11-alpine3.22@sha256:efcdfa6a6b2fd2afb9c7dfa9a5b288a6f68338b5cfdebe6b637d986067d85757  python:3.12.11-alpine3.22  # scripts/tool-versions.env
+docker.io/library/python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b  python:3.12.13-slim-bookworm  # scripts/tool-versions.env
+docker.io/library/node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d  node:24.18.0-bookworm-slim  # scripts/tool-versions.env
+docker.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d  hadolint:v2.15.1  # scripts/tool-versions.env
+docker.io/moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f  buildkit:v0.30.0  # scripts/tool-versions.env
+ghcr.io/k3d-io/k3d:5.9.0@sha256:a2a61a75a4c9ff307b9e4ef483deda39474de3d012872cf42be8c86882e1429c  k3d:5.9.0  # scripts/tool-versions.env
+ghcr.io/k3d-io/k3d-tools:5.9.0@sha256:f18c1e21aba123fe6ff315c514a0feffc005f587aa3db773e89489c2118842dd  k3d-tools:5.9.0  # scripts/tool-versions.env
+docker.io/rancher/k3s:v1.35.5-k3s1@sha256:8bb3c7925bd3eb99b5916e0c5b63af3de4067aaa1f7e3140908f14946c29618c  k3s:v1.35.5-k3s1  # scripts/tool-versions.env
+docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293  node:20-alpine  # frontend/Dockerfile
+docker.io/library/alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659  alpine:3.23.3  # runtime/go-worker/Dockerfile
+docker.io/docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183  dockerfile:1  # Dockerfile syntax frontends
+docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e  dockerfile:1.7  # Dockerfile syntax frontends
+gcr.io/projectsigstore/cosign:v2.4.1@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31  cosign:v2.4.1  # deploy/release-evidence-policy.json
+docker.io/anchore/syft:v1.26.1@sha256:a29957b223c67ee0503018d9228e74495903b0c6290f9bc6d74d1501680fef85  syft:v1.26.1  # deploy/release-evidence-policy.json
+docker.io/aquasec/trivy:0.58.2@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56  trivy:0.58.2  # deploy/release-evidence-policy.json
+ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:25803f45c9e1b5ede2339acb0702050594d91dbbdbd66ea6b62a803572877071  go-contract-tools:sha-81ff8ff4eefbe368b38a5c4e74e20b8c6d44d109  # dev-tool-images.lock.json
+ghcr.io/wilksu/dev-tool-images/playwright-client-tools@sha256:f00af1754b48acf3ea5a31b6333a142eb5ef96c8f0db411fc33c7487b8dfb0e8  playwright-client-tools:sha-b569f079fc8a8bd9ab071962a298ca5fbd76356b  # dev-tool-images.lock.json
+ghcr.io/wilksu/dev-tool-images/android-go-tools@sha256:2230ede1186ff469223cc00dc2f8eeec88f13cb96c51d6184e0979f5c832c37b  android-go-tools:sha-d6127ae7de088d8b93782b03b0c849322e0383d2  # Published Hermes build image
+ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:ea884874ca2b1f8449e027e5e35fecd9a1a3f55d8faa276c4732205fbd339b29  go-contract-tools:sha-ea884874ca2b  # sdk/go/mcp-runtime/examples/ticket/Dockerfile

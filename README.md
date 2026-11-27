@@ -10,8 +10,13 @@ consumers accept immutable OCI digests instead of rebuilding these toolchains.
 | --- | --- | --- |
 | `go-contract-tools` | Go, controller-gen, Buf, Protobuf/Python gRPC, OpenAPI, TypeScript, and Prettier tools | N/A |
 | `playwright-client-tools` | Playwright client, Node types, and TypeScript for browserless test discovery and execution | No |
+| `android-go-tools` | JDK, Go, Android SDK and NDK for Hermes APK builds; Linux amd64 host | N/A |
 
-The stable discovery API is [`catalog/v1/images.json`](catalog/v1/images.json),
+The Android image uses its dedicated [configuration and release workflow](images/android-go-tools/README.md).
+Its existing published revision is `d6127ae7de088d8b93782b03b0c849322e0383d2`;
+the restored source is maintained here and builds on Android-specific changes
+and revision tags. The stable discovery API for the Go and Playwright images is
+[`catalog/v1/images.json`](catalog/v1/images.json),
 which also publishes the inventory pointers and their
 [`inventory.schema.json`](catalog/v1/inventory.schema.json).
 Each catalog entry points to a schema-3 `image.json` with a schema-2 inventory.
@@ -116,32 +121,60 @@ workflow intentionally does not have or seek permission to change visibility.
 ## Public image mirrors in ACR
 
 [`mirrors/images.txt`](mirrors/images.txt) lists public upstream images and their
-target `repository:tag` within the configured ACR namespace, one pair per line:
+target `repository:tag` within the configured ACR namespace, one pair per line.
+The source accepts a tag, a digest, or a readable tag plus a digest:
 
 ```text
-docker.io/mattermost/mattermost-team-edition:latest mattermost:latest
-docker.io/library/nginx:latest nginx:latest
+docker.io/library/redis:7.4-alpine@sha256:<64-hex-digest> redis:7.4-alpine
+ghcr.io/owner/image@sha256:<64-hex-digest> image:sha-<revision>
 ```
 
-These are the [official Mattermost Team Edition image](https://hub.docker.com/r/mattermost/mattermost-team-edition)
-and [official nginx image](https://hub.docker.com/_/nginx). The mirror follows
-their moving tags; it does not deploy or restart any application.
+The dependency snapshot comes from Star-Ferry's release contract, development
+and test Compose files, Kubernetes/Helm definitions, Dockerfiles, tool versions,
+and tool-image lock. It includes runtime services, test/observability services,
+upstream build bases and delivery tools, and the published Go, Playwright and
+Android tool images. Local build stages, generated application images and
+placeholder references are excluded. Different configured versions remain
+separate entries; upstream registry proxies are normalized to their origin.
+MinIO is an explicit exception: its origin currently returns 401, so the list
+uses the DaoCloud cache after verifying the exact project-pinned digest there.
+
+Version policy: `@sha256:...` is authoritative even when a tag precedes it.
+Without a digest, an explicit version follows only that exact tag, never a
+newer version. A bare `:latest` deliberately opts into rolling updates. The
+committed dependency snapshot pins resolved digests, including the previously
+requested `latest` aliases, so scheduled runs repair missing mirrors without
+upgrading dependencies. To upgrade, edit the list explicitly. Mirroring does
+not deploy or restart applications or rewrite Star-Ferry's consumer locks.
 
 The **Mirror images to ACR** workflow runs when this list or its synchronization
 code changes on `master`, manually through **Actions → Mirror images to ACR →
 Run workflow**, and daily at 01:23 UTC (09:23 Asia/Kuala_Lumpur). Pull requests
 only validate the list and run tests; they never receive ACR credentials. Manual
 synchronization also requires `master`.
+The optional manual `images` field selects comma-separated target repository
+names or exact `repository:tag` values, so a failed subset can be retried.
 
 Configure all four values as repository **Actions Secrets**: `ACR_USERNAME`,
 `ACR_PASSWORD`, `ACR_REGISTRY`, and `ACR_NAMESPACE`. Use the Registry fixed password
 and the public registry hostname without a scheme or path. Pre-create the
-namespace and the `mattermost` and `nginx` repositories, and grant the dedicated
-RAM account pull/push access to those repositories. The workflow does not create
-repositories or change visibility. New mirror entries likewise need an existing
-target repository and matching permissions.
+namespace and target repositories, and grant the dedicated RAM account pull/push
+access to those repositories. Targets must already exist or the namespace must
+permit automatic repository creation on push. The workflow does not call ACR
+management APIs or change visibility.
 
-Each run compares the raw upstream and ACR manifest digests. Matching images are
+Runs are serialized across push, manual and scheduled triggers. Within a run,
+only one image is copied at a time; the hosted Skopeo version limits concurrent
+blob transfers to six, leaving room below ACR's ten-operation limit. Throttling,
+temporary network errors and server errors use bounded exponential backoff with
+jitter (four outer attempts, plus Skopeo's transport retries). Invalid credentials
+and missing source manifests fail promptly. An individual image failure does not
+prevent the remaining list from being processed; the run fails if any image still
+fails after retries, and the Summary identifies the failed entries.
+
+Pinned entries check ACR first and skip matching digests without contacting the
+upstream, so a saved snapshot remains usable during an upstream outage. Other
+entries compare the resolved upstream and ACR manifest digests. Matching images are
 skipped; absent or changed images are copied by their resolved digest with all
 upstream platforms preserved, then checked again at ACR. Authentication, network,
 or rate-limit errors fail the run rather than being treated as missing images.

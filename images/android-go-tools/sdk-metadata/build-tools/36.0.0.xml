@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<common:repository xmlns:common="http://schemas.android.com/repository/android/common/02"
+                   xmlns:generic="http://schemas.android.com/repository/android/generic/02"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <localPackage path="build-tools;36.0.0" obsolete="false">
+    <type-details xsi:type="generic:genericDetailsType"/>
+    <revision><major>36</major><minor>0</minor><micro>0</micro></revision>
+    <display-name>Android SDK Build-Tools 36</display-name>
+  </localPackage>
+</common:repository>
