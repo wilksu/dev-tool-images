@@ -1,0 +1,3 @@
+# Source image                                               ACR repository:tag
+docker.io/mattermost/mattermost-team-edition:latest           mattermost:latest
+docker.io/library/nginx:latest                               nginx:latest

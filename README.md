@@ -113,6 +113,55 @@ anonymous manifest read after publishing. If a package does not inherit public
 visibility, an administrator must correct that through the package settings; the
 workflow intentionally does not have or seek permission to change visibility.
 
+## Public image mirrors in ACR
+
+[`mirrors/images.txt`](mirrors/images.txt) lists public upstream images and their
+target `repository:tag` within the configured ACR namespace, one pair per line:
+
+```text
+docker.io/mattermost/mattermost-team-edition:latest mattermost:latest
+docker.io/library/nginx:latest nginx:latest
+```
+
+These are the [official Mattermost Team Edition image](https://hub.docker.com/r/mattermost/mattermost-team-edition)
+and [official nginx image](https://hub.docker.com/_/nginx). The mirror follows
+their moving tags; it does not deploy or restart any application.
+
+The **Mirror images to ACR** workflow runs when this list or its synchronization
+code changes on `master`, manually through **Actions → Mirror images to ACR →
+Run workflow**, and daily at 01:23 UTC (09:23 Asia/Kuala_Lumpur). Pull requests
+only validate the list and run tests; they never receive ACR credentials. Manual
+synchronization also requires `master`.
+
+Configure all four values as repository **Actions Secrets**: `ACR_USERNAME`,
+`ACR_PASSWORD`, `ACR_REGISTRY`, and `ACR_NAMESPACE`. Use the Registry fixed password
+and the public registry hostname without a scheme or path. Pre-create the
+namespace and the `mattermost` and `nginx` repositories, and grant the dedicated
+RAM account pull/push access to those repositories. The workflow does not create
+repositories or change visibility. New mirror entries likewise need an existing
+target repository and matching permissions.
+
+Each run compares the raw upstream and ACR manifest digests. Matching images are
+skipped; absent or changed images are copied by their resolved digest with all
+upstream platforms preserved, then checked again at ACR. Authentication, network,
+or rate-limit errors fail the run rather than being treated as missing images.
+The remote registry is the sync state, so there is no status file to commit back.
+Each run's **Summary** records upstream, target repository/tag, result, digest,
+and check time without exposing the ACR hostname, namespace, or credentials.
+An unchanged digest means no image layers are copied. Successful images remain
+available if another image fails; rerunning skips them.
+
+Validate locally without credentials or registry access:
+
+```sh
+python3 scripts/mirror_acr.py --check
+python3 -m unittest discover -s tests -v
+```
+
+GitHub scheduled runs can be delayed, and scheduled workflows in public
+repositories are automatically disabled after 60 days without repository activity.
+See [GitHub schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+
 ## Supply-chain boundary
 
 Builds use only public dependencies and do not accept secrets. Do not pass

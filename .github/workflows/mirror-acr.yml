@@ -1,0 +1,62 @@
+name: Mirror images to ACR
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - mirrors/images.txt
+      - scripts/mirror_acr.py
+      - tests/test_mirror_acr.py
+      - .github/workflows/mirror-acr.yml
+  pull_request:
+    branches: [master]
+    paths:
+      - mirrors/images.txt
+      - scripts/mirror_acr.py
+      - tests/test_mirror_acr.py
+      - .github/workflows/mirror-acr.yml
+  workflow_dispatch:
+  schedule:
+    # 09:23 Asia/Kuala_Lumpur; avoid the busy start of the hour.
+    - cron: '23 1 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-acr-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Test synchronization decisions and validate the image list
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 scripts/mirror_acr.py --check
+
+  sync:
+    needs: validate
+    if: github.repository == 'wilksu/dev-tool-images' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install registry copy tool
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends skopeo
+      - name: Copy missing or changed images and verify remote digests
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: python3 -u scripts/mirror_acr.py
