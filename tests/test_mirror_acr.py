@@ -13,6 +13,42 @@ from mirror_acr import Image, Registry, check_mirror, manifest_digest, read_imag
 
 
 class MirrorTests(unittest.TestCase):
+    def test_source_rate_limit_uses_same_digest_cache_without_rewriting_destination(self):
+        digest = "sha256:" + "a" * 64
+        source = f"docker://docker.io/aquasec/trivy@{digest}"
+        cached = f"docker://mirror.gcr.io/aquasec/trivy@{digest}"
+        destination = "docker://acr.example/ns/trivy:0.58.2"
+        throttled = subprocess.CompletedProcess([], 1, b"", b"toomanyrequests: unauthenticated pull rate limit")
+        success = subprocess.CompletedProcess([], 0, b"{}", b"")
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        with patch("subprocess.run", side_effect=[throttled, success, success]) as run, patch("time.sleep"):
+            registry.run("copy", "--src-no-creds", source, destination)
+            self.assertEqual(run.call_args_list[0].args[0][-2:], [source, destination])
+            self.assertEqual(run.call_args_list[1].args[0][-2:], [cached, destination])
+            registry.run("inspect", "--no-creds", source)
+            self.assertEqual(run.call_args.args[0][-1], cached)
+        for arguments in (("inspect", "--no-creds", "docker://docker.io/library/nginx:latest"),
+                          ("inspect", "--authfile", "/tmp/auth.json", source)):
+            registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+            with patch("subprocess.run", side_effect=[throttled, success]) as run, patch("time.sleep"):
+                registry.run(*arguments)
+                self.assertEqual(run.call_args.args[0], ["skopeo", *arguments])
+                self.assertFalse(registry.use_dockerhub_cache)
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        destination_limit = subprocess.CompletedProcess([], 1, b"", b"writing manifest: toomanyrequests: concurrent operation limit")
+        with patch("subprocess.run", side_effect=[destination_limit, success]) as run, patch("time.sleep"):
+            registry.run("copy", "--src-no-creds", source, destination)
+            self.assertEqual(run.call_args.args[0][-2:], [source, destination])
+            self.assertFalse(registry.use_dockerhub_cache)
+
+    def test_pinned_upstream_manifest_is_verified_before_use(self):
+        raw = b'{"schemaVersion":2}'
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        registry.run = Mock(return_value=subprocess.CompletedProcess([], 0, raw, b""))
+        self.assertEqual(registry.inspect("docker.io/library/alpine@" + manifest_digest(raw)), manifest_digest(raw))
+        with self.assertRaisesRegex(RuntimeError, "source manifest digest"):
+            registry.inspect("docker.io/library/alpine@sha256:" + "a" * 64)
+
     def test_status_checks_never_copy_missing_or_existing_images(self):
         digest = "sha256:" + "a" * 64
         image = Image(f"docker.io/library/redis@{digest}", "redis:7.4-alpine")

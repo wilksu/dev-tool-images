@@ -180,6 +180,10 @@ jitter (four outer attempts, plus Skopeo's transport retries). Invalid credentia
 and missing source manifests fail promptly. An individual image failure does not
 prevent the remaining list from being processed; the run fails if any image still
 fails after retries, and the Summary identifies the failed entries.
+If an anonymous Docker Hub source hits its pull quota, immutable digest reads
+can retry through the project's existing `mirror.gcr.io` cache. The source
+manifest hash is verified before use; destination addresses and moving tag
+lookups are never redirected. A missing cache entry remains a reported failure.
 
 Pinned entries check ACR first and skip matching digests without contacting the
 upstream, so a saved snapshot remains usable during an upstream outage. Other

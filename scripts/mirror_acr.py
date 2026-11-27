@@ -110,6 +110,7 @@ class Registry:
         self.authfile = authfile
         self.secrets = secrets
         self.manifests: dict[str, bytes] = {}
+        self.use_dockerhub_cache = False
         # Credentials are passed only to login, never inherited by copy/inspect.
         self.environment = {key: value for key, value in os.environ.items() if key not in SECRET_NAMES}
 
@@ -120,10 +121,23 @@ class Registry:
         return text
 
     def run(self, *arguments: str, password: str | None = None, timeout: int = 180) -> subprocess.CompletedProcess:
+        command = list(arguments)
+        # Only anonymous source reads by immutable digest may use the cache.
+        # Never rewrite a destination, login, or a moving tag lookup.
+        source_position = None
+        if command[0] == "inspect" and "--no-creds" in command:
+            source_position = len(command) - 1
+        elif command[0] == "copy" and "--src-no-creds" in command:
+            source_position = len(command) - 2
+        source = command[source_position] if source_position is not None else ""
+        cache_source = source.replace("docker://docker.io/", "docker://mirror.gcr.io/", 1)
+        cache_eligible = source.startswith("docker://docker.io/") and bool(re.search(r"@sha256:[0-9a-f]{64}$", source))
+        if cache_eligible and self.use_dockerhub_cache:
+            command[source_position] = cache_source
         for attempt in range(4):
             try:
                 result = subprocess.run(
-                    ["skopeo", *arguments],
+                    ["skopeo", *command],
                     input=password.encode() if password is not None else None,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -132,6 +146,13 @@ class Registry:
                     check=False,
                 )
                 error = result.stderr.decode(errors="replace").lower()
+                source_throttled = command[0] == "inspect" or "pull rate limit" in error or "initializing source" in error
+                if (result.returncode and source_throttled and cache_eligible and not self.use_dockerhub_cache and attempt < 3
+                        and any(marker in error for marker in ("toomanyrequests", "too many requests", "429", "rate limit", "ratelimit"))):
+                    self.use_dockerhub_cache = True
+                    command[source_position] = cache_source
+                    print("Docker Hub source rate limit; retrying the same digest through mirror.gcr.io", flush=True)
+                    continue
                 if result.returncode == 0 or not any(marker in error for marker in TRANSIENT_ERRORS) or attempt == 3:
                     return result
             except subprocess.TimeoutExpired:
@@ -164,6 +185,8 @@ class Registry:
                 return None
             self.require_success(result)
         if not destination:
+            if "@sha256:" in reference and manifest_digest(result.stdout) != reference.split("@", 1)[1]:
+                raise RuntimeError("source manifest digest does not match the pinned digest")
             self.manifests[reference] = result.stdout
         return manifest_digest(result.stdout) if destination else source_digest(result.stdout)
 
