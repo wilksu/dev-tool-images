@@ -1,6 +1,7 @@
 """Exercise skip, update, failure and manifest-preservation behavior without credentials."""
 
 import pathlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -8,10 +9,18 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
-from mirror_acr import Image, Registry, manifest_digest, read_images, synchronize
+from mirror_acr import Image, Registry, manifest_digest, read_images, source_digest, synchronize
 
 
 class MirrorTests(unittest.TestCase):
+    def test_single_platform_attestation_index_uses_the_runtime_digest(self):
+        runtime = {"digest": "sha256:" + "a" * 64, "platform": {"os": "linux", "architecture": "amd64"}}
+        attestation = {"digest": "sha256:" + "b" * 64, "annotations": {"vnd.docker.reference.type": "attestation-manifest"}}
+        raw = json.dumps({"manifests": [runtime, attestation]}).encode()
+        self.assertEqual(source_digest(raw), runtime["digest"])
+        multi_platform = json.dumps({"manifests": [runtime, {"digest": "sha256:" + "c" * 64, "platform": {"os": "linux", "architecture": "arm64"}}, attestation]}).encode()
+        self.assertEqual(source_digest(multi_platform), manifest_digest(multi_platform))
+
     def test_list_supports_comments_and_rejects_unsafe_or_duplicate_targets(self):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "images.txt"

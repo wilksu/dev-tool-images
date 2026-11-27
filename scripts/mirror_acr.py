@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -58,6 +59,23 @@ def manifest_digest(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def source_digest(raw: bytes) -> str:
+    """Unwrap a single runnable image from an index with attestations.
+
+    ACR Personal rejects Mattermost's OCI-empty attestation config. Its sole
+    runtime manifest remains byte-for-byte unchanged; multi-platform indexes
+    such as nginx are copied intact.
+    """
+    manifests = json.loads(raw).get("manifests", [])
+    runtime = [item for item in manifests if item.get("annotations", {}).get("vnd.docker.reference.type") != "attestation-manifest"]
+    if len(runtime) == 1 and len(manifests) > 1:
+        digest = runtime[0]["digest"]
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ValueError("upstream runtime manifest has an invalid digest")
+        return digest
+    return manifest_digest(raw)
+
+
 class Registry:
     def __init__(self, authfile: pathlib.Path, secrets: dict[str, str]):
         self.authfile = authfile
@@ -107,7 +125,7 @@ class Registry:
             if destination and any(marker in error for marker in ("manifest unknown", "manifest_unknown", "name unknown", "name_unknown")):
                 return None
             self.require_success(result)
-        return manifest_digest(result.stdout)
+        return manifest_digest(result.stdout) if destination else source_digest(result.stdout)
 
     def copy(self, source: str, destination: str) -> None:
         result = self.run(

@@ -151,6 +151,13 @@ and check time without exposing the ACR hostname, namespace, or credentials.
 An unchanged digest means no image layers are copied. Successful images remain
 available if another image fails; rerunning skips them.
 
+For an upstream index containing just one runnable image plus attestations
+(currently Mattermost), synchronization copies that runtime manifest directly.
+Its digest is recorded in the Summary; the attestation wrapper is omitted because
+ACR Personal rejects Mattermost's OCI-empty attestation config. Multi-platform
+indexes such as nginx are kept intact. Mirror-only changes do not trigger the
+development tool images' build CI.
+
 Validate locally without credentials or registry access:
 
 ```sh
