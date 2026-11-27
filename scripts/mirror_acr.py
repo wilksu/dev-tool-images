@@ -194,7 +194,7 @@ class Registry:
         result = self.run(
             "copy", "--all", "--preserve-digests", "--retry-times", "3",
             "--src-no-creds", "--dest-authfile", str(self.authfile),
-            f"docker://{source}", f"docker://{destination}", timeout=1800,
+            f"docker://{source}", f"docker://{destination}", timeout=600,
         )
         self.require_success(result)
 

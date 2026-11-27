@@ -177,7 +177,9 @@ only one image is copied at a time; the hosted Skopeo version limits concurrent
 blob transfers to six, leaving room below ACR's ten-operation limit. Throttling,
 temporary network errors and server errors use bounded exponential backoff with
 jitter (four outer attempts, plus Skopeo's transport retries). Invalid credentials
-and missing source manifests fail promptly. An individual image failure does not
+and missing source manifests fail promptly. Each copy attempt is bounded to ten
+minutes, so a stalled transfer can retry and reuse already uploaded layers.
+An individual image failure does not
 prevent the remaining list from being processed; the run fails if any image still
 fails after retries, and the Summary identifies the failed entries.
 If an anonymous Docker Hub source hits its pull quota, immutable digest reads
