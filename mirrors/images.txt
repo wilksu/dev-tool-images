@@ -8,7 +8,7 @@ docker.io/pgvector/pgvector:0.8.5-pg17@sha256:d2ef61f42ef767baa5a1475393303cc235
 docker.io/arigaio/atlas:1.3.0-community@sha256:57f5560604d8a9595eb2bbd91177a2455e33143842c5691e6cde2fa2c6f1a226  atlas:1.3.0-community  # scripts/tool-versions.env
 docker.io/library/redis:7.4-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf  redis:7.4-alpine  # deploy/release-contract.json
 docker.io/library/rabbitmq:4.0-management-alpine@sha256:35b2a11a4731c3a5346080722a3f5279ecf674aab32239b9ec59141473825133  rabbitmq:4.0-management-alpine  # deploy/release-contract.json
-docker.m.daocloud.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e  minio:RELEASE.2025-09-07T16-13-09Z  # exact project digest retained in DaoCloud cache; original registry returns 401
+docker.m.daocloud.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e  minio:RELEASE.2025-09-07T16-13-09Z  # exact index cached; arm64/ppc64le currently denied; origin returns 401
 docker.io/casbin/casdoor:3.98.0@sha256:7b7ba21d611775b5fabd0829616f060b14c0f1537ed897f7a571e6c48624ed55  casdoor:3.98.0  # deploy/release-contract.json
 docker.io/library/traefik:v3.7.5@sha256:e4d98158c01ad752fc1071d4e9573788747230d902cdde00a772516e692d07c9  traefik:v3.7.5  # deploy/release-contract.json
 docker.io/calciumion/new-api@sha256:428018a37c0b26c163a3367c18401161707cd0e08d0f26a3dde9ff0caa05e34c  new-api:sha-428018a37c0b  # deploy/release-contract.json

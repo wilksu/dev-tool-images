@@ -139,7 +139,10 @@ Android tool images. Local build stages, generated application images and
 placeholder references are excluded. Different configured versions remain
 separate entries; upstream registry proxies are normalized to their origin.
 MinIO is an explicit exception: its origin currently returns 401, so the list
-uses the DaoCloud cache after verifying the exact project-pinned digest there.
+uses the DaoCloud cache after verifying the exact project-pinned index digest
+there. The cached amd64 manifest is readable, but the arm64 and ppc64le manifests
+currently return access errors. An incomplete cache is reported as a failed
+mirror; the workflow does not silently drop platforms or substitute a release.
 
 Version policy: `@sha256:...` is authoritative even when a tag precedes it.
 Without a digest, an explicit version follows only that exact tag, never a
