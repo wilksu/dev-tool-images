@@ -9,10 +9,21 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
-from mirror_acr import Image, Registry, manifest_digest, read_images, runtime_index, source_digest, synchronize
+from mirror_acr import Image, Registry, check_mirror, manifest_digest, read_images, runtime_index, source_digest, synchronize
 
 
 class MirrorTests(unittest.TestCase):
+    def test_status_checks_never_copy_missing_or_existing_images(self):
+        digest = "sha256:" + "a" * 64
+        image = Image(f"docker.io/library/redis@{digest}", "redis:7.4-alpine")
+        for existing, expected in ((None, ("missing", "—")), (digest, ("present", digest))):
+            registry = Mock()
+            registry.inspect.return_value = existing
+            self.assertEqual(check_mirror(image, "acr/ns", registry), expected)
+            registry.inspect.assert_called_once_with("acr/ns/redis:7.4-alpine", destination=True)
+            registry.copy.assert_not_called()
+            registry.copy_runtime_index.assert_not_called()
+
     def test_runtime_only_keeps_all_platform_manifests_and_is_idempotent(self):
         platforms = [{"digest": "sha256:" + character * 64, "platform": {"os": "linux", "architecture": architecture}}
                      for character, architecture in (("a", "amd64"), ("b", "arm64"))]

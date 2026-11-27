@@ -156,6 +156,10 @@ only validate the list and run tests; they never receive ACR credentials. Manual
 synchronization also requires `master`.
 The optional manual `images` field selects comma-separated target repository
 names or exact `repository:tag` values, so a failed subset can be retried.
+Select **check_only** to inspect remote state without copying. This read-only
+mode reports `present`, `missing`, or `different`; missing entries are inventory
+results rather than failed copy operations. One status workflow may run alongside
+the serialized upload workflow, adding only one sequential registry request.
 
 Configure all four values as repository **Actions Secrets**: `ACR_USERNAME`,
 `ACR_PASSWORD`, `ACR_REGISTRY`, and `ACR_NAMESPACE`. Use the Registry fixed password

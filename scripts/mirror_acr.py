@@ -196,13 +196,7 @@ class Registry:
             self.require_success(result)
 
 
-def synchronize(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
-    destination = f"{prefix}/{image.target}"
-    pinned = image.source.split("@", 1)[1] if "@" in image.source else None
-    existing = registry.inspect(destination, destination=True) if pinned else None
-    # A matching pinned mirror remains usable even if the upstream goes away.
-    if pinned and existing == pinned and not image.runtime_only:
-        return "unchanged", pinned
+def resolve_image(image: Image, registry: Registry) -> tuple[str, bytes | None]:
     digest = registry.inspect(image.pull_reference)
     filtered_index = None
     if image.runtime_only:
@@ -211,6 +205,28 @@ def synchronize(image: Image, prefix: str, registry: Registry) -> tuple[str, str
         if filtered != original:
             filtered_index = filtered
             digest = manifest_digest(filtered)
+    return digest, filtered_index
+
+
+def check_mirror(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
+    existing = registry.inspect(f"{prefix}/{image.target}", destination=True)
+    if existing is None:
+        return "missing", "—"
+    pinned = image.source.split("@", 1)[1] if "@" in image.source else None
+    if pinned and existing == pinned and not image.runtime_only:
+        return "present", existing
+    digest, _ = resolve_image(image, registry)
+    return ("present" if existing == digest else "different"), existing
+
+
+def synchronize(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
+    destination = f"{prefix}/{image.target}"
+    pinned = image.source.split("@", 1)[1] if "@" in image.source else None
+    existing = registry.inspect(destination, destination=True) if pinned else None
+    # A matching pinned mirror remains usable even if the upstream goes away.
+    if pinned and existing == pinned and not image.runtime_only:
+        return "unchanged", pinned
+    digest, filtered_index = resolve_image(image, registry)
     if not pinned:
         existing = registry.inspect(destination, destination=True)
     if existing == digest:
@@ -249,6 +265,7 @@ def main() -> int:
     parser.add_argument("--list", type=pathlib.Path, default=ROOT / "mirrors/images.txt")
     parser.add_argument("--check", action="store_true", help="validate the list without secrets or registry requests")
     parser.add_argument("--only", default=os.environ.get("MIRROR_IMAGES", ""), help="comma-separated target repositories or repository:tag values")
+    parser.add_argument("--status-only", action="store_true", default=os.environ.get("MIRROR_STATUS_ONLY") == "true", help="inspect target state without copying any image")
     args = parser.parse_args()
     images = read_images(args.list)
     if args.check:
@@ -267,7 +284,8 @@ def main() -> int:
     secrets = credentials()
     prefix = f"{secrets['ACR_REGISTRY']}/{secrets['ACR_NAMESPACE']}"
     timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    append_summary(f"## ACR image synchronization\n\nChecked at {timestamp}. All upstream platforms are preserved.\n\n"
+    title = "ACR mirror status (read only)" if args.status_only else "ACR image synchronization"
+    append_summary(f"## {title}\n\nChecked at {timestamp}. All upstream platforms are preserved.\n\n"
                    "| Upstream | Target within ACR namespace | Result | Manifest digest |\n"
                    "| --- | --- | --- | --- |\n")
     failures = 0
@@ -277,7 +295,7 @@ def main() -> int:
         def mirror_one(image: Image) -> bool:
             print(f"Checking {image.source}", flush=True)
             try:
-                status, digest = synchronize(image, prefix, registry)
+                status, digest = (check_mirror if args.status_only else synchronize)(image, prefix, registry)
                 print(f"{image.source}: {status} ({digest})", flush=True)
                 append_summary(f"| `{image.source}` | `{image.target}` | {status} | `{digest}` |\n")
                 return True

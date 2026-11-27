@@ -21,6 +21,11 @@ on:
         description: 'Optional comma-separated target repositories or repository:tag values; empty copies the whole list'
         required: false
         type: string
+      check_only:
+        description: 'Inspect ACR state without copying images'
+        required: false
+        type: boolean
+        default: false
   schedule:
     # 09:23 Asia/Kuala_Lumpur; avoid the busy start of the hour.
     - cron: '23 1 * * *'
@@ -29,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mirror-acr-${{ github.ref }}
+  group: ${{ inputs.check_only && 'mirror-acr-status' || format('mirror-acr-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
@@ -46,6 +51,7 @@ jobs:
           python3 scripts/mirror_acr.py --check
 
   sync:
+    name: ${{ inputs.check_only && 'Check ACR mirror status' || 'Synchronize configured images' }}
     needs: validate
     if: github.repository == 'wilksu/dev-tool-images' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -58,11 +64,12 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends skopeo
-      - name: Copy missing or changed images and verify remote digests
+      - name: ${{ inputs.check_only && 'Inspect remote mirrors without copying' || 'Copy missing or changed images and verify remote digests' }}
         env:
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
           ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           MIRROR_IMAGES: ${{ inputs.images }}
+          MIRROR_STATUS_ONLY: ${{ inputs.check_only }}
         run: python3 -u scripts/mirror_acr.py
