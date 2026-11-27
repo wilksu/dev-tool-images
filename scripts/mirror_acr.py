@@ -200,15 +200,19 @@ class Registry:
 
     def copy_runtime_index(self, repository: str, raw: bytes, destination: str) -> None:
         target_repository = destination.rsplit(":", 1)[0]
-        for descriptor in json.loads(raw)["manifests"]:
+        descriptors = json.loads(raw)["manifests"]
+        for number, descriptor in enumerate(descriptors, 1):
             digest = descriptor["digest"]
             if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
                 raise ValueError("upstream runtime manifest has an invalid digest")
             # Digest destinations avoid temporary platform tags. Existing runtime
             # manifests from a partial copy can be reused without uploading layers.
             reference = f"{target_repository}@{digest}"
+            print(f"Runtime manifest {number}/{len(descriptors)}: {digest}", flush=True)
             if self.inspect(reference, destination=True) != digest:
                 self.copy(f"{repository}@{digest}", reference)
+            print(f"Runtime manifest {number}/{len(descriptors)} ready", flush=True)
+        print("Publishing runtime platform index", flush=True)
         with tempfile.TemporaryDirectory(prefix="acr-index-") as directory:
             pathlib.Path(directory, "manifest.json").write_bytes(raw)
             result = self.run(
@@ -234,6 +238,16 @@ def resolve_image(image: Image, registry: Registry) -> tuple[str, bytes | None]:
 def check_mirror(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
     existing = registry.inspect(f"{prefix}/{image.target}", destination=True)
     if existing is None:
+        if image.runtime_only:
+            _, filtered_index = resolve_image(image, registry)
+            if filtered_index is not None:
+                repository = f"{prefix}/{image.target.split(':', 1)[0]}"
+                for descriptor in json.loads(filtered_index)["manifests"]:
+                    digest = descriptor["digest"]
+                    present = registry.inspect(f"{repository}@{digest}", destination=True) == digest
+                    platform = descriptor.get("platform", {})
+                    name = "/".join(str(platform.get(key, "?")) for key in ("os", "architecture"))
+                    print(f"{image.target} runtime {name}: {'present' if present else 'missing'} ({digest})", flush=True)
         return "missing", "—"
     pinned = image.source.split("@", 1)[1] if "@" in image.source else None
     if pinned and existing == pinned and not image.runtime_only:
