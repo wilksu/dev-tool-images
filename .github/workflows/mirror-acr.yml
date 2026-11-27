@@ -62,8 +62,11 @@ jobs:
           persist-credentials: false
       - name: Install registry copy tool
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends skopeo
+          # Only Ubuntu packages are needed; unrelated preinstalled vendor
+          # repositories must not block registry synchronization.
+          apt_options=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${apt_options[@]}" update -qq
+          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends skopeo
       - name: ${{ inputs.check_only && 'Inspect remote mirrors without copying' || 'Copy missing or changed images and verify remote digests' }}
         env:
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
