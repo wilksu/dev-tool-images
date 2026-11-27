@@ -39,13 +39,13 @@ docker.io/library/python:3.12.11-alpine3.22@sha256:efcdfa6a6b2fd2afb9c7dfa9a5b28
 docker.io/library/python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b  python:3.12.13-slim-bookworm  # scripts/tool-versions.env
 docker.io/library/node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d  node:24.18.0-bookworm-slim  # scripts/tool-versions.env
 docker.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d  hadolint:v2.15.1  # scripts/tool-versions.env
-docker.io/moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f  buildkit:v0.30.0  # scripts/tool-versions.env
+docker.io/moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f  buildkit:v0.30.0  runtime-only  # scripts/tool-versions.env; ACR omits incompatible attestations
 ghcr.io/k3d-io/k3d:5.9.0@sha256:a2a61a75a4c9ff307b9e4ef483deda39474de3d012872cf42be8c86882e1429c  k3d:5.9.0  # scripts/tool-versions.env
 ghcr.io/k3d-io/k3d-tools:5.9.0@sha256:f18c1e21aba123fe6ff315c514a0feffc005f587aa3db773e89489c2118842dd  k3d-tools:5.9.0  # scripts/tool-versions.env
 docker.io/rancher/k3s:v1.35.5-k3s1@sha256:8bb3c7925bd3eb99b5916e0c5b63af3de4067aaa1f7e3140908f14946c29618c  k3s:v1.35.5-k3s1  # scripts/tool-versions.env
 docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293  node:20-alpine  # frontend/Dockerfile
 docker.io/library/alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659  alpine:3.23.3  # runtime/go-worker/Dockerfile
-docker.io/docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183  dockerfile:1  # Dockerfile syntax frontends
+docker.io/docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183  dockerfile:1  runtime-only  # Dockerfile syntax frontends; ACR omits incompatible attestations
 docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e  dockerfile:1.7  # Dockerfile syntax frontends
 gcr.io/projectsigstore/cosign:v2.4.1@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31  cosign:v2.4.1  # deploy/release-evidence-policy.json
 docker.io/anchore/syft:v1.26.1@sha256:a29957b223c67ee0503018d9228e74495903b0c6290f9bc6d74d1501680fef85  syft:v1.26.1  # deploy/release-evidence-policy.json

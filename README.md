@@ -122,11 +122,13 @@ workflow intentionally does not have or seek permission to change visibility.
 
 [`mirrors/images.txt`](mirrors/images.txt) lists public upstream images and their
 target `repository:tag` within the configured ACR namespace, one pair per line.
-The source accepts a tag, a digest, or a readable tag plus a digest:
+The source accepts a tag, a digest, or a readable tag plus a digest. An optional
+third field, `runtime-only`, handles the ACR attestation compatibility exception:
 
 ```text
 docker.io/library/redis:7.4-alpine@sha256:<64-hex-digest> redis:7.4-alpine
 ghcr.io/owner/image@sha256:<64-hex-digest> image:sha-<revision>
+docker.io/moby/buildkit:v0.30.0@sha256:<64-hex-digest> buildkit:v0.30.0 runtime-only
 ```
 
 The dependency snapshot comes from Star-Ferry's release contract, development
@@ -187,8 +189,14 @@ available if another image fails; rerunning skips them.
 For an upstream index containing just one runnable image plus attestations
 (currently Mattermost), synchronization copies that runtime manifest directly.
 Its digest is recorded in the Summary; the attestation wrapper is omitted because
-ACR Personal rejects Mattermost's OCI-empty attestation config. Multi-platform
-indexes such as nginx are kept intact. Mirror-only changes do not trigger the
+ACR Personal rejects Mattermost's OCI-empty attestation config. For multi-platform
+entries marked `runtime-only` (BuildKit and the current Dockerfile frontend), the
+copy retains every runtime platform and its original manifest digest, omits the
+incompatible attestation descriptors, then publishes and verifies a new index.
+Existing runtime manifests from a partial copy are reused without temporary
+platform tags. The resulting **index digest differs from upstream**: use the
+target digest in the Summary or the configured target tag when consuming it.
+Other multi-platform indexes such as nginx are kept intact. Mirror-only changes do not trigger the
 development tool images' build CI.
 
 Validate locally without credentials or registry access:

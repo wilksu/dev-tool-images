@@ -37,6 +37,7 @@ TRANSIENT_ERRORS = (
 class Image:
     source: str
     target: str
+    runtime_only: bool = False
 
     @property
     def repository(self) -> str:
@@ -56,15 +57,15 @@ def read_images(path: pathlib.Path) -> list[Image]:
         fields = line.partition("#")[0].split()
         if not fields:
             continue
-        if len(fields) != 2 or not SOURCE.fullmatch(fields[0]):
-            raise ValueError(f"{path.name}:{number}: expected fully qualified source:tag or source@sha256:digest and repository:tag")
+        if len(fields) not in (2, 3) or not SOURCE.fullmatch(fields[0]) or (len(fields) == 3 and fields[2] != "runtime-only"):
+            raise ValueError(f"{path.name}:{number}: expected source:tag or source@sha256:digest, repository:tag, and optional runtime-only")
         match = TARGET.fullmatch(fields[1])
         if not match or not 2 <= len(match[1]) <= 64:
             raise ValueError(f"{path.name}:{number}: ACR target needs a 2-64 character repository name and a tag")
         if fields[1] in targets:
             raise ValueError(f"{path.name}:{number}: duplicate ACR target")
         targets.add(fields[1])
-        images.append(Image(*fields))
+        images.append(Image(fields[0], fields[1], len(fields) == 3))
     if not images:
         raise ValueError("image list is empty")
     return images
@@ -91,10 +92,24 @@ def source_digest(raw: bytes) -> str:
     return manifest_digest(raw)
 
 
+def runtime_index(raw: bytes) -> bytes:
+    """Keep every runnable platform while omitting explicitly marked attestations."""
+    index = json.loads(raw)
+    manifests = index.get("manifests", [])
+    selected = [item for item in manifests if item.get("annotations", {}).get("vnd.docker.reference.type") != "attestation-manifest"]
+    if selected == manifests:
+        return raw
+    if not selected:
+        raise ValueError("upstream index has no runtime manifests")
+    index["manifests"] = selected
+    return json.dumps(index, separators=(",", ":")).encode()
+
+
 class Registry:
     def __init__(self, authfile: pathlib.Path, secrets: dict[str, str]):
         self.authfile = authfile
         self.secrets = secrets
+        self.manifests: dict[str, bytes] = {}
         # Credentials are passed only to login, never inherited by copy/inspect.
         self.environment = {key: value for key, value in os.environ.items() if key not in SECRET_NAMES}
 
@@ -148,6 +163,8 @@ class Registry:
             if destination and any(marker in error for marker in ("manifest unknown", "manifest_unknown", "name unknown", "name_unknown")):
                 return None
             self.require_success(result)
+        if not destination:
+            self.manifests[reference] = result.stdout
         return manifest_digest(result.stdout) if destination else source_digest(result.stdout)
 
     def copy(self, source: str, destination: str) -> None:
@@ -158,22 +175,52 @@ class Registry:
         )
         self.require_success(result)
 
+    def copy_runtime_index(self, repository: str, raw: bytes, destination: str) -> None:
+        target_repository = destination.rsplit(":", 1)[0]
+        for descriptor in json.loads(raw)["manifests"]:
+            digest = descriptor["digest"]
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                raise ValueError("upstream runtime manifest has an invalid digest")
+            # Digest destinations avoid temporary platform tags. Existing runtime
+            # manifests from a partial copy can be reused without uploading layers.
+            reference = f"{target_repository}@{digest}"
+            if self.inspect(reference, destination=True) != digest:
+                self.copy(f"{repository}@{digest}", reference)
+        with tempfile.TemporaryDirectory(prefix="acr-index-") as directory:
+            pathlib.Path(directory, "manifest.json").write_bytes(raw)
+            result = self.run(
+                "copy", "--multi-arch", "index-only", "--preserve-digests",
+                "--retry-times", "3", "--dest-authfile", str(self.authfile),
+                f"dir:{directory}", f"docker://{destination}",
+            )
+            self.require_success(result)
+
 
 def synchronize(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
     destination = f"{prefix}/{image.target}"
     pinned = image.source.split("@", 1)[1] if "@" in image.source else None
     existing = registry.inspect(destination, destination=True) if pinned else None
     # A matching pinned mirror remains usable even if the upstream goes away.
-    if pinned and existing == pinned:
+    if pinned and existing == pinned and not image.runtime_only:
         return "unchanged", pinned
     digest = registry.inspect(image.pull_reference)
+    filtered_index = None
+    if image.runtime_only:
+        original = registry.manifests[image.pull_reference]
+        filtered = runtime_index(original)
+        if filtered != original:
+            filtered_index = filtered
+            digest = manifest_digest(filtered)
     if not pinned:
         existing = registry.inspect(destination, destination=True)
     if existing == digest:
         return "unchanged", digest
     print(f"Copying {image.source} to {image.target}", flush=True)
     # Pin the source after resolving its moving tag to avoid a tag-update race.
-    registry.copy(f"{image.repository}@{digest}", destination)
+    if filtered_index is not None:
+        registry.copy_runtime_index(image.repository, filtered_index, destination)
+    else:
+        registry.copy(f"{image.repository}@{digest}", destination)
     if registry.inspect(destination, destination=True) != digest:
         raise RuntimeError("destination digest does not match the resolved upstream digest")
     return "copied", digest

@@ -9,10 +9,43 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
-from mirror_acr import Image, Registry, manifest_digest, read_images, source_digest, synchronize
+from mirror_acr import Image, Registry, manifest_digest, read_images, runtime_index, source_digest, synchronize
 
 
 class MirrorTests(unittest.TestCase):
+    def test_runtime_only_keeps_all_platform_manifests_and_is_idempotent(self):
+        platforms = [{"digest": "sha256:" + character * 64, "platform": {"os": "linux", "architecture": architecture}}
+                     for character, architecture in (("a", "amd64"), ("b", "arm64"))]
+        proof = {"digest": "sha256:" + "c" * 64, "annotations": {"vnd.docker.reference.type": "attestation-manifest"}}
+        original = json.dumps({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [*platforms, proof]}).encode()
+        filtered = runtime_index(original)
+        self.assertEqual(json.loads(filtered)["manifests"], platforms)
+        self.assertEqual(runtime_index(filtered), filtered)
+        registry = Mock()
+        source = "docker.io/moby/buildkit@sha256:" + "d" * 64
+        registry.manifests = {source: original}
+        registry.inspect.side_effect = [None, manifest_digest(original), manifest_digest(filtered)]
+        self.assertEqual(synchronize(Image(source, "buildkit:v1", True), "acr/ns", registry), ("copied", manifest_digest(filtered)))
+        registry.copy_runtime_index.assert_called_once_with("docker.io/moby/buildkit", filtered, "acr/ns/buildkit:v1")
+        registry.copy.assert_not_called()
+        registry.reset_mock()
+        registry.inspect.side_effect = [manifest_digest(filtered), manifest_digest(original)]
+        self.assertEqual(synchronize(Image(source, "buildkit:v1", True), "acr/ns", registry), ("unchanged", manifest_digest(filtered)))
+        registry.copy_runtime_index.assert_not_called()
+
+    def test_runtime_index_publication_reuses_existing_children_and_pushes_index_only(self):
+        digest = "sha256:" + "a" * 64
+        raw = json.dumps({"schemaVersion": 2, "manifests": [{"digest": digest}]}).encode()
+        registry = Registry(pathlib.Path("/tmp/auth.json"), {})
+        registry.inspect = Mock(return_value=digest)
+        registry.copy = Mock()
+        registry.run = Mock(return_value=subprocess.CompletedProcess([], 0, b"", b""))
+        registry.copy_runtime_index("docker.io/moby/buildkit", raw, "acr/ns/buildkit:v1")
+        registry.inspect.assert_called_once_with(f"acr/ns/buildkit@{digest}", destination=True)
+        registry.copy.assert_not_called()
+        self.assertIn("index-only", registry.run.call_args.args)
+        self.assertIn("--preserve-digests", registry.run.call_args.args)
+
     def test_throttling_retries_with_backoff_but_authentication_does_not(self):
         throttled = subprocess.CompletedProcess([], 1, b"", b"TOOMANYREQUESTS: concurrent operation limit")
         success = subprocess.CompletedProcess([], 0, b"{}", b"")
@@ -75,9 +108,12 @@ class MirrorTests(unittest.TestCase):
             path = pathlib.Path(directory) / "images.txt"
             path.write_text("# comment\ndocker.io/library/nginx:latest nginx:latest # tracked tag\n")
             self.assertEqual(read_images(path), [Image("docker.io/library/nginx:latest", "nginx:latest")])
+            path.write_text("docker.io/moby/buildkit:v1 buildkit:v1 runtime-only\n")
+            self.assertEqual(read_images(path), [Image("docker.io/moby/buildkit:v1", "buildkit:v1", True)])
             for text in (
                 "nginx nginx:latest\n",
                 "docker.io/library/nginx:latest other/path:latest\n",
+                "docker.io/library/nginx:latest nginx:latest arbitrary-option\n",
                 "docker.io/library/nginx:latest nginx:latest\ndocker.io/library/httpd:latest nginx:latest\n",
             ):
                 path.write_text(text)
