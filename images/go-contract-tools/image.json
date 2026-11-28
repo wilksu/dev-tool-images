@@ -220,7 +220,7 @@
         "id": "git",
         "kind": "alpine-package",
         "package": "git",
-        "version": "2.54.0-r0",
+        "version": "2.54.1-r0",
         "version_arg": "ALPINE_GIT_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
@@ -244,7 +244,7 @@
         "id": "perl",
         "kind": "alpine-package",
         "package": "perl",
-        "version": "5.42.2-r1",
+        "version": "5.42.3-r0",
         "version_arg": "ALPINE_PERL_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports"
       },
@@ -252,7 +252,7 @@
         "id": "python3",
         "kind": "alpine-package",
         "package": "python3",
-        "version": "3.14.10-r1",
+        "version": "3.14.10-r2",
         "version_arg": "ALPINE_PYTHON3_VERSION",
         "source": "https://gitlab.alpinelinux.org/alpine/aports",
         "executables": ["python3"]

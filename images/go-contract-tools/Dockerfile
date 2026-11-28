@@ -51,10 +51,11 @@ FROM ${NODE_BASE_IMAGE} AS grpc-python-tools
 ARG GRPC_PYTHON_PLUGIN_VERSION
 ARG GRPC_PYTHON_PLUGIN_REVISION
 ARG GRPC_PYTHON_PLUGIN_PROTOBUF_REVISION
+ARG ALPINE_GIT_VERSION
 RUN apk add --no-cache \
       "cmake=4.2.3-r0" \
       "g++=15.2.0-r5" \
-      "git=2.54.0-r0" \
+      "git=${ALPINE_GIT_VERSION}" \
       "linux-headers=7.0.0-r1" \
       "make=4.4.1-r4"
 COPY grpc-python-plugin.CMakeLists.txt /tmp/grpc-python-plugin/CMakeLists.txt
