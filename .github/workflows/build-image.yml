@@ -1,0 +1,93 @@
+name: Build and verify candidate
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      revision:
+        required: true
+        type: string
+      release:
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  BUILDKIT_IMAGE: moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+
+jobs:
+  verify:
+    name: ${{ inputs.image }} (${{ inputs.platform }})
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          driver-opts: |
+            image=${{ env.BUILDKIT_IMAGE }}
+      - run: bash scripts/install_registry_tools.sh
+      - id: config
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          python3 scripts/image_config.py build-args "$IMAGE"
+          mkdir -p "$RUNNER_TEMP/candidate"
+      - id: build
+        name: Export native OCI candidate with SBOM and provenance
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: images/${{ inputs.image }}
+          file: images/${{ inputs.image }}/Dockerfile
+          platforms: ${{ inputs.platform }}
+          outputs: type=oci,dest=${{ runner.temp }}/candidate/image.tar
+          build-contexts: ${{ steps.config.outputs.build_contexts }}
+          build-args: ${{ steps.config.outputs.build_args }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ inputs.revision }}
+            io.starferry.tool.name=${{ inputs.image }}
+            io.starferry.tool.inventory-path=${{ steps.config.outputs.inventory_path }}
+          cache-from: type=gha,scope=${{ inputs.image }}-${{ inputs.platform }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image }}-${{ inputs.platform }}
+          provenance: mode=max
+          sbom: true
+      - id: verify
+        name: Test the exported runtime and record its exact content
+        env:
+          IMAGE: ${{ inputs.image }}
+          PLATFORM: ${{ inputs.platform }}
+          REVISION: ${{ inputs.revision }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          CHECK_LAYERS: ${{ !inputs.release && inputs.image == 'android-go-tools' }}
+        run: |
+          options=()
+          if [ "$CHECK_LAYERS" = true ]; then options+=(--check-layers); fi
+          python3 scripts/verify_candidate.py --image "$IMAGE" --platform "$PLATFORM" \
+            --revision "$REVISION" --digest "$DIGEST" \
+            --archive "$RUNNER_TEMP/candidate/image.tar" "${options[@]}"
+          echo "arch=${PLATFORM#linux/}" >> "$GITHUB_OUTPUT"
+      - name: Retain verified release candidate for publication and retries
+        if: inputs.release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-${{ inputs.image }}-${{ steps.verify.outputs.arch }}
+          path: |
+            ${{ runner.temp }}/candidate/image.tar
+            ${{ runner.temp }}/candidate/candidate.json
+          compression-level: 0
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: error

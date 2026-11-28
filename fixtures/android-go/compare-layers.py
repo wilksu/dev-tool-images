@@ -8,16 +8,13 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from oci_artifacts import read_blob, root_digest, runtime_entries
+
 
 def manifest(layout):
-    index = json.loads((layout / "index.json").read_text())
-    descriptor, = index["manifests"]
-    while "index" in descriptor["mediaType"]:
-        algorithm, digest = descriptor["digest"].split(":", 1)
-        nested = json.loads((layout / "blobs" / algorithm / digest).read_text())
-        descriptor, = nested["manifests"]
-    algorithm, digest = descriptor["digest"].split(":", 1)
-    return descriptor["digest"], json.loads((layout / "blobs" / algorithm / digest).read_text())
+    descriptor = runtime_entries(layout, root_digest(layout))["linux/amd64"]
+    return descriptor["digest"], read_blob(layout, descriptor["digest"])
 
 
 def main():

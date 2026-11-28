@@ -4,81 +4,114 @@ on:
   push:
     tags:
       - '*/rev-*'
-      - '!android-go-tools/rev-*'
 
 permissions:
   contents: read
-  packages: write
-  attestations: write
-  id-token: write
-
-env:
-  BUILDKIT_IMAGE: moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
 
 concurrency:
   group: publish-${{ github.ref }}
+  queue: max
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish immutable revision image
+  prepare:
+    if: github.repository == 'wilksu/dev-tool-images'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 10
+    permissions:
+      contents: write # Read pending draft records on retries.
+    outputs:
+      build: ${{ steps.release.outputs.build }}
+      matrix: ${{ steps.release.outputs.matrix }}
+      image: ${{ steps.release.outputs.image_name }}
+      registry_image: ${{ steps.release.outputs.image }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - id: release
-        name: Resolve source revision through the public catalog
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          SOURCE_REVISION: ${{ github.sha }}
-        run: python3 scripts/resolve_release.py
-      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
-      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
-          driver-opts: |
-            image=${{ env.BUILDKIT_IMAGE }}
-      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+          persist-credentials: false
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REVISION: ${{ github.sha }}
+        run: python3 scripts/owned_release.py prepare --tag "$RELEASE_TAG" --revision "$REVISION" --run-id "$GITHUB_RUN_ID"
+
+  candidate:
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ${{ matrix.image }}
+      platform: ${{ matrix.platform }}
+      runner: ${{ matrix.runner }}
+      revision: ${{ github.sha }}
+      release: true
+
+  publish:
+    name: Publish verified OCI content and record delivery intent
+    if: always() && needs.prepare.result == 'success' && (needs.candidate.result == 'success' || needs.candidate.result == 'skipped')
+    needs: [prepare, candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+      attestations: write
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - run: bash scripts/install_registry_tools.sh
+      - id: probe
+        name: Resume the original recorded publication if one exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/owned_release.py probe --tag "$RELEASE_TAG" --revision "$REVISION" --run-id "$GITHUB_RUN_ID"
+      - if: steps.probe.outputs.needed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: candidate-${{ needs.prepare.outputs.image }}-*
+          path: ${{ runner.temp }}/candidates
+          run-id: ${{ steps.probe.outputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - id: publish
+        name: Upload the tested content without rebuilding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/owned_release.py publish --tag "$RELEASE_TAG" --revision "$REVISION"
+          --run-id "$GITHUB_RUN_ID" --candidates "$RUNNER_TEMP/candidates"
+      - name: Authenticate the provenance action to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: build
-        name: Build and publish multi-platform revision image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        with:
-          context: ${{ steps.release.outputs.context }}
-          file: ${{ steps.release.outputs.context }}/Dockerfile
-          platforms: ${{ steps.release.outputs.platforms }}
-          push: true
-          tags: ${{ steps.release.outputs.discovery_tag }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
-            io.starferry.tool.name=${{ steps.release.outputs.image_name }}
-            io.starferry.tool.inventory-path=${{ steps.release.outputs.inventory_path }}
-          build-args: ${{ steps.release.outputs.build_args }}
-          cache-from: |
-            type=gha,scope=${{ steps.release.outputs.image_name }}-publish
-            type=gha,scope=${{ steps.release.outputs.image_name }}-amd64
-            type=gha,scope=${{ steps.release.outputs.image_name }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ steps.release.outputs.image_name }}-publish
-          provenance: mode=max
-          sbom: true
-      - name: Record GitHub build provenance
+      - name: Record GitHub build provenance for the published digest
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-name: ${{ steps.release.outputs.image }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-name: ${{ needs.prepare.outputs.registry_image }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
           push-to-registry: true
-      - name: Verify published manifest anonymously
+      - name: Complete durable release record
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE: ${{ steps.release.outputs.image }}
-          PLATFORMS: ${{ steps.release.outputs.platforms }}
-          REVISION: ${{ steps.release.outputs.revision }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
-          python3 scripts/verify_manifest.py
-          --image "$IMAGE"
-          --revision "$REVISION"
-          --digest "$DIGEST"
-          --platforms "$PLATFORMS"
+          python3 scripts/owned_release.py finalize --tag "$RELEASE_TAG" --revision "$REVISION"
+          --run-id "$GITHUB_RUN_ID" --notification "$RUNNER_TEMP/delivery.json"
+      - name: Notify the passive ACR listener with JSON only
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-record
+          path: ${{ runner.temp }}/delivery.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90

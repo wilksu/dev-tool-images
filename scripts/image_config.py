@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read the public catalog and project image configurations."""
+"""Resolve owned image configuration and the compatible public v1 projection."""
 
 from __future__ import annotations
 
@@ -21,7 +21,40 @@ def read_json(path: pathlib.Path) -> dict:
 
 
 def load_catalog() -> dict:
-    return read_json(ROOT / "catalog/v1/images.json")
+    catalog = read_json(ROOT / "catalog/images.json")
+    catalog["identity"] = {
+        "release": "source_revision",
+        "discovery": "source_revision_tag",
+        "consumer": "oci_manifest_digest",
+        "source_revision_pattern": "^[0-9a-f]{40}$",
+    }
+    for name, entry in catalog["images"].items():
+        entry.update({
+            "registry": f"ghcr.io/{catalog['source_repository']}/{name}",
+            "config": f"images/{name}/image.json",
+            "inventory": f"images/{name}/image.json" + ("#inventory" if entry["driver"] == "inventory" else ""),
+            "release_tag_prefix": f"{name}/rev-",
+            "discovery_tag_prefix": "sha-",
+            "acr_repository": name,
+        })
+    return catalog
+
+
+def legacy_catalog(catalog: dict | None = None) -> dict:
+    catalog = catalog or load_catalog()
+    names = catalog["legacy_v1_images"]
+    platforms = catalog["images"][names[0]]["platforms"]
+    if any(catalog["images"][name]["platforms"] != platforms for name in names):
+        raise ValueError("public v1 cannot represent different platform sets; introduce a new API version")
+    fields = ("registry", "config", "inventory", "fixture", "release_tag_prefix", "discovery_tag_prefix")
+    return {
+        "schema": 2,
+        "source_repository": catalog["source_repository"],
+        "identity": catalog["identity"],
+        "inventory_schema": catalog["inventory_schema"],
+        "platforms": platforms,
+        "images": {name: {key: catalog["images"][name][key] for key in fields} for name in names},
+    }
 
 
 def load_image(name: str, catalog: dict | None = None) -> tuple[dict, dict]:
@@ -34,6 +67,16 @@ def load_image(name: str, catalog: dict | None = None) -> tuple[dict, dict]:
 
 
 def build_arguments(config: dict) -> list[str]:
+    if "jdk" in config:
+        arguments = {"JDK_BASE_IMAGE": config["jdk"]["image"]}
+        for component in ("go", "android_platform", "build_tools", "ndk"):
+            prefix = component.upper()
+            for key in ("url", "sha256", "sha1", "package", "revision"):
+                if key in config[component]:
+                    arguments[f"{prefix}_{key.upper()}"] = config[component][key]
+            if package := config[component].get("package"):
+                arguments[f"{prefix}_METADATA"] = package.replace(";", "/") + ".xml"
+        return [f"{key}={value}" for key, value in arguments.items()]
     arguments: dict[str, str] = {}
 
     def add(key: str, value: str) -> None:
@@ -55,10 +98,11 @@ def build_arguments(config: dict) -> list[str]:
     return [f"{key}={value}" for key, value in arguments.items()]
 
 
-def ci_matrix(catalog: dict) -> dict[str, list[dict[str, str]]]:
+def ci_matrix(catalog: dict, names: list[str] | None = None) -> dict[str, list[dict[str, str]]]:
     include = []
-    for name, entry in catalog["images"].items():
-        for platform in catalog["platforms"]:
+    for name in names if names is not None else catalog["images"]:
+        entry = catalog["images"][name]
+        for platform in entry["platforms"]:
             include.append(
                 {
                     "image": name,
@@ -88,14 +132,18 @@ def main() -> None:
     fixture = subparsers.add_parser("fixture")
     fixture.add_argument("image")
     subparsers.add_parser("ci-matrix")
+    subparsers.add_parser("legacy-catalog")
     args = parser.parse_args()
 
     catalog = load_catalog()
     if args.command == "build-args":
-        _, config = load_image(args.image, catalog)
+        entry, config = load_image(args.image, catalog)
         value = "\n".join(build_arguments(config))
         if "GITHUB_OUTPUT" in os.environ:
             write_github_output("build_args", value)
+            write_github_output("build_contexts", f"inventory=images/{args.image}" if entry["driver"] == "android" else "")
+            write_github_output("driver", entry["driver"])
+            write_github_output("inventory_path", entry["inventory"])
         else:
             print(value)
     elif args.command == "fixture":
@@ -107,6 +155,8 @@ def main() -> None:
             write_github_output("matrix", value)
         else:
             print(value)
+    elif args.command == "legacy-catalog":
+        print(json.dumps(legacy_catalog(catalog), indent=2))
 
 
 if __name__ == "__main__":

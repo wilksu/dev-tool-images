@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SECRET_NAMES = ("ACR_REGISTRY", "ACR_NAMESPACE", "ACR_USERNAME", "ACR_PASSWORD")
+PROCESS_SECRET_NAMES = (*SECRET_NAMES, "GH_TOKEN", "GITHUB_TOKEN", "GHCR_TOKEN")
 REPOSITORY = r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*"
 TAG = r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}"
 SOURCE = re.compile(rf"[a-z0-9]+(?:[.-][a-z0-9]+)*(?::[0-9]+)?/(?:{REPOSITORY}/)*{REPOSITORY}(?::{TAG}(?:@sha256:[0-9a-f]{{64}})?|@sha256:[0-9a-f]{{64}})")
@@ -48,6 +49,14 @@ class Image:
     def pull_reference(self) -> str:
         # containers/image does not accept a reference containing both tag and digest.
         return f"{self.repository}@{self.source.split('@', 1)[1]}" if "@" in self.source else self.source
+
+
+@dataclass(frozen=True)
+class SyncRequest:
+    image: Image
+    expected_digest: str | None = None
+    runtime_manifest: bytes | None = None
+    preserve_index: bool = False
 
 
 def read_images(path: pathlib.Path) -> list[Image]:
@@ -112,7 +121,7 @@ class Registry:
         self.manifests: dict[str, bytes] = {}
         self.use_dockerhub_cache = False
         # Credentials are passed only to login, never inherited by copy/inspect.
-        self.environment = {key: value for key, value in os.environ.items() if key not in SECRET_NAMES}
+        self.environment = {key: value for key, value in os.environ.items() if key not in PROCESS_SECRET_NAMES}
 
     def redact(self, text: str) -> str:
         for value in sorted(set(self.secrets.values()), key=len, reverse=True):
@@ -167,11 +176,12 @@ class Registry:
             error = result.stderr.decode(errors="replace").strip()
             raise RuntimeError(self.redact(error) or "registry operation failed")
 
-    def login(self) -> None:
+    def login(self, *, hostname: str | None = None, username: str | None = None, password: str | None = None) -> None:
         result = self.run(
             "login", "--authfile", str(self.authfile),
-            "--username", self.secrets["ACR_USERNAME"], "--password-stdin",
-            self.secrets["ACR_REGISTRY"], password=self.secrets["ACR_PASSWORD"],
+            "--username", username if username is not None else self.secrets["ACR_USERNAME"], "--password-stdin",
+            hostname if hostname is not None else self.secrets["ACR_REGISTRY"],
+            password=password if password is not None else self.secrets["ACR_PASSWORD"],
         )
         self.require_success(result)
 
@@ -223,20 +233,33 @@ class Registry:
             self.require_success(result)
 
 
-def resolve_image(image: Image, registry: Registry) -> tuple[str, bytes | None]:
+def resolve_image(image: Image, registry: Registry, *, runtime_manifest: bytes | None = None,
+                  preserve_index: bool = False) -> tuple[str, bytes | None]:
     digest = registry.inspect(image.pull_reference)
     filtered_index = None
+    if preserve_index:
+        digest = manifest_digest(registry.manifests[image.pull_reference])
     if image.runtime_only:
         original = registry.manifests[image.pull_reference]
         filtered = runtime_index(original)
+        if runtime_manifest is not None:
+            # Preserve the recorded byte identity even if JSON serialization
+            # changes later, but require precisely the source runtime content.
+            if json.loads(runtime_manifest) != json.loads(filtered):
+                raise ValueError("recorded ACR index does not match the source runtime index")
+            filtered = runtime_manifest
         if filtered != original:
             filtered_index = filtered
             digest = manifest_digest(filtered)
     return digest, filtered_index
 
 
-def check_mirror(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
+def check_mirror(image: Image, prefix: str, registry: Registry, *, expected_digest: str | None = None,
+                 runtime_manifest: bytes | None = None, preserve_index: bool = False) -> tuple[str, str]:
     existing = registry.inspect(f"{prefix}/{image.target}", destination=True)
+    if expected_digest is not None:
+        return ("missing", "—") if existing is None else (
+            "present" if existing == expected_digest else "different", existing)
     if existing is None:
         if image.runtime_only:
             _, filtered_index = resolve_image(image, registry)
@@ -256,14 +279,19 @@ def check_mirror(image: Image, prefix: str, registry: Registry) -> tuple[str, st
     return ("present" if existing == digest else "different"), existing
 
 
-def synchronize(image: Image, prefix: str, registry: Registry) -> tuple[str, str]:
+def synchronize(image: Image, prefix: str, registry: Registry, *, expected_digest: str | None = None,
+                runtime_manifest: bytes | None = None, preserve_index: bool = False) -> tuple[str, str]:
     destination = f"{prefix}/{image.target}"
     pinned = image.source.split("@", 1)[1] if "@" in image.source else None
     existing = registry.inspect(destination, destination=True) if pinned else None
+    if expected_digest is not None and existing == expected_digest:
+        return "unchanged", expected_digest
     # A matching pinned mirror remains usable even if the upstream goes away.
-    if pinned and existing == pinned and not image.runtime_only:
+    if expected_digest is None and pinned and existing == pinned and not image.runtime_only:
         return "unchanged", pinned
-    digest, filtered_index = resolve_image(image, registry)
+    digest, filtered_index = resolve_image(image, registry, runtime_manifest=runtime_manifest, preserve_index=preserve_index)
+    if expected_digest is not None and digest != expected_digest:
+        raise ValueError("resolved delivery digest does not match the release record")
     if not pinned:
         existing = registry.inspect(destination, destination=True)
     if existing == digest:
@@ -297,6 +325,43 @@ def credentials() -> dict[str, str]:
     return values
 
 
+def run_requests(requests: list[SyncRequest], *, status_only: bool = False,
+                 report_path: pathlib.Path | None = None) -> int:
+    if not requests:
+        print("No image deliveries selected")
+        if report_path is not None:
+            report_path.write_text("[]\n")
+        return 0
+    secrets = credentials()
+    prefix = f"{secrets['ACR_REGISTRY']}/{secrets['ACR_NAMESPACE']}"
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    title = "ACR mirror status (read only)" if status_only else "ACR image delivery"
+    append_summary(f"## {title}\n\nChecked at {timestamp}. All runtime platforms are preserved.\n\n"
+                   "| Source | Target within ACR namespace | Result | Target digest |\n"
+                   "| --- | --- | --- | --- |\n")
+    results = []
+    with tempfile.TemporaryDirectory(prefix="acr-auth-") as directory:
+        registry = Registry(pathlib.Path(directory) / "auth.json", secrets)
+        registry.login()
+        for request in requests:
+            image = request.image
+            print(f"Checking {image.source}", flush=True)
+            try:
+                status, digest = (check_mirror if status_only else synchronize)(image, prefix, registry,
+                    expected_digest=request.expected_digest, runtime_manifest=request.runtime_manifest,
+                    preserve_index=request.preserve_index)
+                print(f"{image.source}: {status} ({digest})", flush=True)
+                append_summary(f"| `{image.source}` | `{image.target}` | {status} | `{digest}` |\n")
+                results.append({"source": image.source, "target": image.target, "status": status, "digest": digest})
+            except (RuntimeError, ValueError) as error:
+                print(f"{image.source}: FAILED: {registry.redact(str(error))}", file=sys.stderr, flush=True)
+                append_summary(f"| `{image.source}` | `{image.target}` | FAILED; see step log | — |\n")
+                results.append({"source": image.source, "target": image.target, "status": "failed", "digest": None})
+    if report_path is not None:
+        report_path.write_text(json.dumps(results, indent=2) + "\n")
+    return int(any(result["status"] == "failed" for result in results))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--list", type=pathlib.Path, default=ROOT / "mirrors/images.txt")
@@ -318,32 +383,8 @@ def main() -> int:
         if not images:
             raise ValueError("no images selected")
 
-    secrets = credentials()
-    prefix = f"{secrets['ACR_REGISTRY']}/{secrets['ACR_NAMESPACE']}"
-    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    title = "ACR mirror status (read only)" if args.status_only else "ACR image synchronization"
-    append_summary(f"## {title}\n\nChecked at {timestamp}. All upstream platforms are preserved.\n\n"
-                   "| Upstream | Target within ACR namespace | Result | Manifest digest |\n"
-                   "| --- | --- | --- | --- |\n")
-    failures = 0
-    with tempfile.TemporaryDirectory(prefix="acr-auth-") as directory:
-        registry = Registry(pathlib.Path(directory) / "auth.json", secrets)
-        registry.login()
-        def mirror_one(image: Image) -> bool:
-            print(f"Checking {image.source}", flush=True)
-            try:
-                status, digest = (check_mirror if args.status_only else synchronize)(image, prefix, registry)
-                print(f"{image.source}: {status} ({digest})", flush=True)
-                append_summary(f"| `{image.source}` | `{image.target}` | {status} | `{digest}` |\n")
-                return True
-            except (RuntimeError, ValueError) as error:
-                print(f"{image.source}: FAILED: {registry.redact(str(error))}", file=sys.stderr, flush=True)
-                append_summary(f"| `{image.source}` | `{image.target}` | FAILED; see step log | — |\n")
-                return False
-        # One image at a time: Skopeo 1.13 internally copies up to six blobs,
-        # leaving headroom below ACR Personal's ten-operation concurrency limit.
-        failures = sum(not mirror_one(image) for image in images)
-    return int(failures > 0)
+    # One image at a time: Skopeo copies at most six blobs concurrently.
+    return run_requests([SyncRequest(image) for image in images], status_only=args.status_only)
 
 
 if __name__ == "__main__":

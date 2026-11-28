@@ -41,7 +41,8 @@ APK from the host with `adb`.
 
 ## Remote verification and release
 
-The verification workflow builds a container on GitHub Actions. It warms
+The shared CI pipeline builds this tool on Android-specific changes in pull
+requests and on `master`. It warms
 the fixture's Gradle cache, repeats compilation with networking disabled,
 checks the native library and file ownership in each ABI's APK, and
 compares OCI layers after changing only Go or SDK Platform. The reported
@@ -50,9 +51,13 @@ from a warm client.
 
 A Git tag named `android-go-tools/rev-<full-commit-sha>` verifies and
 publishes that revision to `ghcr.io/wilksu/dev-tool-images/android-go-tools`.
-The workflow copies the verified OCI image with its manifest digest preserved.
+The unified Publish pipeline copies the verified OCI runtime content and
+proofs without rebuilding, and emits the same release record as the other tools.
+The ACR workflow passively consumes the successful publication and copies its
+runtime platforms. ACR delivery can be retried independently of publication.
 The `sha-<full-commit-sha>` registry tag is a discovery handle. Pin the digest
-from the workflow summary when using the image.
+from the GitHub Release's `release.json` or the ACR run's summary when using the
+image; the ACR index omits proof descriptors and has its own recorded digest.
 
 The image retains the component notices provided in the Android tool archives.
 Google lists these archives under the Android SDK License Agreement, which

@@ -6,7 +6,11 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from image_config import build_arguments
 
 
 def main():
@@ -24,15 +28,6 @@ def main():
     image_dir = Path(__file__).resolve().parent
     inventory_path = args.config or image_dir / "image.json"
     inventory = json.loads(inventory_path.read_text())
-    inputs = {"JDK_BASE_IMAGE": inventory["jdk"]["image"]}
-    for component in ("go", "android_platform", "build_tools", "ndk"):
-        prefix = component.upper()
-        for key in ("url", "sha256", "sha1", "package", "revision"):
-            if key in inventory[component]:
-                inputs[f"{prefix}_{key.upper()}"] = inventory[component][key]
-        if package := inventory[component].get("package"):
-            inputs[f"{prefix}_METADATA"] = package.replace(";", "/") + ".xml"
-
     command = ["docker", "buildx", "build", "--platform", inventory["platform"],
                "--progress=plain", "--provenance=false"]
     if args.tag:
@@ -41,8 +36,8 @@ def main():
         command.extend(["--output", f"type=oci,tar=false,dest={args.oci}"])
     if args.revision:
         command.extend(["--label", f"org.opencontainers.image.revision={args.revision}"])
-    for name, value in inputs.items():
-        command.extend(["--build-arg", f"{name}={value}"])
+    for value in build_arguments(inventory):
+        command.extend(["--build-arg", value])
 
     with tempfile.TemporaryDirectory() as context:
         (Path(context) / "image.json").write_text(inventory_path.read_text())

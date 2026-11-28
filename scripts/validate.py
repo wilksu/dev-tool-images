@@ -8,7 +8,9 @@ import re
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from image_config import RUNNERS, build_arguments, load_catalog, load_image, read_json
+from image_config import RUNNERS, build_arguments, legacy_catalog, load_catalog, load_image, read_json
+from acr_delivery import external_requests, select_requests
+from release_records import load_imports, to_request
 from resolve_release import resolve_release
 
 
@@ -39,19 +41,33 @@ def validate_npm(config: dict, image_dir: pathlib.Path) -> None:
 def validate_image(
     name: str, entry: dict, catalog: dict, inventory_validator: Draft202012Validator
 ) -> None:
-    assert entry == {
-        "registry": f"ghcr.io/wilksu/dev-tool-images/{name}",
-        "config": f"images/{name}/image.json",
-        "inventory": f"images/{name}/image.json#inventory",
-        "fixture": entry["fixture"],
-        "release_tag_prefix": f"{name}/rev-",
-        "discovery_tag_prefix": "sha-",
-    }
+    assert re.fullmatch(r"[a-z][a-z0-9-]+", name)
+    assert entry["driver"] in {"inventory", "android"}
+    assert entry["platforms"] and len(set(entry["platforms"])) == len(entry["platforms"])
+    assert set(entry["platforms"]) <= set(RUNNERS)
+    assert entry["acr_copy_mode"] in {"exact", "runtime-only"}
+    assert entry["inputs"] and all(not path.startswith("/") and ".." not in path.split("/") for path in entry["inputs"])
     assert (ROOT / entry["fixture"]).is_dir()
 
     _, config = load_image(name, catalog)
-    assert config["schema"] == 3
     assert config["name"] == name
+    image_dir = ROOT / entry["config"].rsplit("/", 1)[0]
+    dockerfile = (image_dir / "Dockerfile").read_text(encoding="utf-8")
+    for item in build_arguments(config):
+        argument = item.split("=", 1)[0]
+        assert re.search(rf"^ARG {re.escape(argument)}(?:=|$)", dockerfile, re.MULTILINE), argument
+    if entry["driver"] == "android":
+        assert entry["platforms"] == [config["platform"]] == ["linux/amd64"]
+        assert DIGEST_REFERENCE.search(config["jdk"]["image"])
+        for component in ("go", "android_platform", "build_tools", "ndk"):
+            value = config[component]
+            assert value["url"].startswith("https://")
+            assert re.fullmatch(r"[0-9a-f]{64}", value["sha256"])
+            if "package" in value:
+                assert re.fullmatch(r"[0-9a-f]{40}", value["sha1"])
+                assert (image_dir / "sdk-metadata" / (value["package"].replace(";", "/") + ".xml")).is_file()
+        return
+    assert config["schema"] == 3
     assert all(DIGEST_REFERENCE.search(value) for value in config["base_images"].values())
     inventory_validator.validate(config["inventory"])
     components = config["inventory"]["components"]
@@ -59,12 +75,10 @@ def validate_image(
     for component in components:
         if component["kind"] == "release-binary":
             assert {item["platform"] for item in component["artifacts"]} == set(
-                catalog["platforms"]
+                entry["platforms"]
             )
 
-    image_dir = ROOT / entry["config"].rsplit("/", 1)[0]
     validate_npm(config, image_dir)
-    dockerfile = (image_dir / "Dockerfile").read_text(encoding="utf-8")
     configured_args = {item.split("=", 1)[0] for item in build_arguments(config)}
     for argument in configured_args:
         assert re.search(rf"^ARG {re.escape(argument)}(?:=|$)", dockerfile, re.MULTILINE)
@@ -96,19 +110,10 @@ def validate_workflows() -> None:
             assert "image=${{ env.BUILDKIT_IMAGE }}" in text
     assert len(buildkit_images) == 1
 
-    ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    assert "python3 scripts/image_config.py ci-matrix" in ci
-    assert "scripts/verify_image.sh" in ci
-    publish = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
-    assert "- '*/rev-*'" in publish
-    assert "python3 scripts/resolve_release.py" in publish
-    assert "scripts/verify_manifest.py" in publish
-    assert "org.opencontainers.image.version" not in publish
-
 
 def main() -> None:
     catalog = load_catalog()
-    assert catalog["schema"] == 2
+    assert catalog["schema"] == 1
     assert catalog["source_repository"] == "wilksu/dev-tool-images"
     assert catalog["identity"] == {
         "release": "source_revision",
@@ -116,9 +121,8 @@ def main() -> None:
         "consumer": "oci_manifest_digest",
         "source_revision_pattern": "^[0-9a-f]{40}$",
     }
-    assert catalog["platforms"] == ["linux/amd64", "linux/arm64"]
-    assert set(RUNNERS) == set(catalog["platforms"])
-    assert set(catalog["images"]) == {"go-contract-tools", "playwright-client-tools"}
+    assert {p.name for p in (ROOT / "images").iterdir() if p.is_dir()} == set(catalog["images"])
+    assert legacy_catalog(catalog) == read_json(ROOT / "catalog/v1/images.json"), "public v1 contract changed"
 
     schema = read_json(ROOT / catalog["inventory_schema"])
     Draft202012Validator.check_schema(schema)
@@ -128,7 +132,7 @@ def main() -> None:
         validate_image(name, entry, catalog, inventory_validator)
         release, _ = resolve_release(f"{entry['release_tag_prefix']}{revision}", revision)
         assert release["image_name"] == name
-        assert release["platforms"] == ",".join(catalog["platforms"])
+        assert release["platforms"] == ",".join(entry["platforms"])
         try:
             resolve_release(f"{entry['release_tag_prefix']}{revision}", "b" * 40)
         except ValueError as error:
@@ -136,6 +140,8 @@ def main() -> None:
         else:
             raise AssertionError("revision mismatch was accepted")
     validate_workflows()
+    requests = select_requests(external_requests() + [to_request(record) for record in load_imports()])
+    print(f"Validated {len(catalog['images'])} owned images and {len(requests)} external/imported delivery intents")
 
 
 if __name__ == "__main__":

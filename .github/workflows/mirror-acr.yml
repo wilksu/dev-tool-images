@@ -1,78 +1,65 @@
 name: Mirror images to ACR
 
 on:
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
   push:
     branches: [master]
     paths:
       - mirrors/images.txt
-      - scripts/mirror_acr.py
-      - tests/test_mirror_acr.py
-      - .github/workflows/mirror-acr.yml
-  pull_request:
-    branches: [master]
-    paths:
-      - mirrors/images.txt
-      - scripts/mirror_acr.py
-      - tests/test_mirror_acr.py
-      - .github/workflows/mirror-acr.yml
+      - releases/imported.json
   workflow_dispatch:
     inputs:
       images:
-        description: 'Optional comma-separated target repositories or repository:tag values; empty copies the whole list'
-        required: false
+        description: 'Optional comma-separated target repositories or repository:tag values; empty reconciles all'
         type: string
+        required: false
       check_only:
         description: 'Inspect ACR state without copying images'
-        required: false
         type: boolean
         default: false
   schedule:
-    # 09:23 Asia/Kuala_Lumpur; avoid the busy start of the hour.
+    # 09:23 Asia/Kuala_Lumpur; reconcile desired versions, never choose upgrades.
     - cron: '23 1 * * *'
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ inputs.check_only && 'mirror-acr-status' || format('mirror-acr-{0}', github.ref) }}
-  cancel-in-progress: false
+  actions: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - name: Test synchronization decisions and validate the image list
-        run: |
-          python3 -m unittest discover -s tests -v
-          python3 scripts/mirror_acr.py --check
-
   sync:
-    name: ${{ inputs.check_only && 'Check ACR mirror status' || 'Synchronize configured images' }}
-    needs: validate
-    if: github.repository == 'wilksu/dev-tool-images' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    if: >-
+      github.repository == 'wilksu/dev-tool-images' && github.ref == 'refs/heads/master' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    concurrency:
+      # All upload entry points share this lock; queue rather than replace runs.
+      group: ${{ inputs.check_only && 'acr-status' || 'acr-delivery' }}
+      queue: max
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Check out trusted default-branch delivery code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - name: Install registry copy tool
-        run: |
-          # Only Ubuntu packages are needed; unrelated preinstalled vendor
-          # repositories must not block registry synchronization.
-          apt_options=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
-          sudo apt-get "${apt_options[@]}" update -qq
-          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends skopeo
-      - name: ${{ inputs.check_only && 'Inspect remote mirrors without copying' || 'Copy missing or changed images and verify remote digests' }}
+      - run: bash scripts/install_registry_tools.sh
+      - name: Validate release intent, then copy missing or changed content
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
           ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           MIRROR_IMAGES: ${{ inputs.images }}
           MIRROR_STATUS_ONLY: ${{ inputs.check_only }}
-        run: python3 -u scripts/mirror_acr.py
+        run: python3 -u scripts/acr_delivery.py
+      - name: Retain source-to-target digest results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: acr-results
+          path: ${{ runner.temp }}/acr-results.json
+          if-no-files-found: ignore
+          retention-days: 90

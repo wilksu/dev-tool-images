@@ -50,7 +50,3 @@ docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269b
 gcr.io/projectsigstore/cosign:v2.4.1@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31  cosign:v2.4.1  # deploy/release-evidence-policy.json
 docker.io/anchore/syft:v1.26.1@sha256:a29957b223c67ee0503018d9228e74495903b0c6290f9bc6d74d1501680fef85  syft:v1.26.1  # deploy/release-evidence-policy.json
 docker.io/aquasec/trivy:0.58.2@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56  trivy:0.58.2  # deploy/release-evidence-policy.json
-ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:25803f45c9e1b5ede2339acb0702050594d91dbbdbd66ea6b62a803572877071  go-contract-tools:sha-81ff8ff4eefbe368b38a5c4e74e20b8c6d44d109  # dev-tool-images.lock.json
-ghcr.io/wilksu/dev-tool-images/playwright-client-tools@sha256:f00af1754b48acf3ea5a31b6333a142eb5ef96c8f0db411fc33c7487b8dfb0e8  playwright-client-tools:sha-b569f079fc8a8bd9ab071962a298ca5fbd76356b  # dev-tool-images.lock.json
-ghcr.io/wilksu/dev-tool-images/android-go-tools@sha256:2230ede1186ff469223cc00dc2f8eeec88f13cb96c51d6184e0979f5c832c37b  android-go-tools:sha-d6127ae7de088d8b93782b03b0c849322e0383d2  # Published Hermes build image
-ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:ea884874ca2b1f8449e027e5e35fecd9a1a3f55d8faa276c4732205fbd339b29  go-contract-tools:sha-ea884874ca2b  # sdk/go/mcp-runtime/examples/ticket/Dockerfile

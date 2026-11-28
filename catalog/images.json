@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "source_repository": "wilksu/dev-tool-images",
+  "inventory_schema": "catalog/v1/inventory.schema.json",
+  "legacy_v1_images": ["go-contract-tools", "playwright-client-tools"],
+  "shared_build_inputs": [
+    "catalog/images.json",
+    "scripts/image_config.py",
+    "scripts/oci_artifacts.py",
+    "scripts/verify_candidate.py",
+    "scripts/verify_image.sh",
+    ".github/workflows/build-image.yml",
+    ".github/workflows/ci.yml"
+  ],
+  "images": {
+    "go-contract-tools": {
+      "driver": "inventory",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "fixture": "fixtures/contract",
+      "inputs": ["images/go-contract-tools/**", "fixtures/contract/**"],
+      "acr_copy_mode": "runtime-only"
+    },
+    "playwright-client-tools": {
+      "driver": "inventory",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "fixture": "fixtures/playwright",
+      "inputs": ["images/playwright-client-tools/**", "fixtures/playwright/**"],
+      "acr_copy_mode": "runtime-only"
+    },
+    "android-go-tools": {
+      "driver": "android",
+      "platforms": ["linux/amd64"],
+      "fixture": "fixtures/android-go",
+      "inputs": [
+        "images/android-go-tools/**",
+        "fixtures/android-go/**",
+        "scripts/verify_android_image.sh"
+      ],
+      "acr_copy_mode": "runtime-only"
+    }
+  }
+}

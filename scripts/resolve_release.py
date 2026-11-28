@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve one revision release tag through the checked-in public catalog."""
+"""Resolve one revision release tag through the internal owned-image catalog."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def resolve_release(tag: str, checked_revision: str) -> tuple[dict[str, str], li
         ),
         "inventory_path": entry["inventory"],
         "context": str(config_path.parent.relative_to(ROOT)),
-        "platforms": ",".join(catalog["platforms"]),
+        "platforms": ",".join(entry["platforms"]),
     }
     return outputs, arguments
 

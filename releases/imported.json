@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "records": [
+    {
+      "schema": 1,
+      "kind": "imported",
+      "repository": "wilksu/dev-tool-images",
+      "image": "go-contract-tools",
+      "revision": "81ff8ff4eefbe368b38a5c4e74e20b8c6d44d109",
+      "release_tag": null,
+      "source_run_id": null,
+      "source": "ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:25803f45c9e1b5ede2339acb0702050594d91dbbdbd66ea6b62a803572877071",
+      "target": "go-contract-tools:sha-81ff8ff4eefbe368b38a5c4e74e20b8c6d44d109",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "copy_mode": "exact",
+      "acr_digest": "sha256:25803f45c9e1b5ede2339acb0702050594d91dbbdbd66ea6b62a803572877071",
+      "acr_manifest": null
+    },
+    {
+      "schema": 1,
+      "kind": "imported",
+      "repository": "wilksu/dev-tool-images",
+      "image": "playwright-client-tools",
+      "revision": "b569f079fc8a8bd9ab071962a298ca5fbd76356b",
+      "release_tag": null,
+      "source_run_id": null,
+      "source": "ghcr.io/wilksu/dev-tool-images/playwright-client-tools@sha256:f00af1754b48acf3ea5a31b6333a142eb5ef96c8f0db411fc33c7487b8dfb0e8",
+      "target": "playwright-client-tools:sha-b569f079fc8a8bd9ab071962a298ca5fbd76356b",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "copy_mode": "exact",
+      "acr_digest": "sha256:f00af1754b48acf3ea5a31b6333a142eb5ef96c8f0db411fc33c7487b8dfb0e8",
+      "acr_manifest": null
+    },
+    {
+      "schema": 1,
+      "kind": "imported",
+      "repository": "wilksu/dev-tool-images",
+      "image": "android-go-tools",
+      "revision": "d6127ae7de088d8b93782b03b0c849322e0383d2",
+      "release_tag": null,
+      "source_run_id": null,
+      "source": "ghcr.io/wilksu/dev-tool-images/android-go-tools@sha256:2230ede1186ff469223cc00dc2f8eeec88f13cb96c51d6184e0979f5c832c37b",
+      "target": "android-go-tools:sha-d6127ae7de088d8b93782b03b0c849322e0383d2",
+      "platforms": [
+        "linux/amd64"
+      ],
+      "copy_mode": "exact",
+      "acr_digest": "sha256:2230ede1186ff469223cc00dc2f8eeec88f13cb96c51d6184e0979f5c832c37b",
+      "acr_manifest": null
+    },
+    {
+      "schema": 1,
+      "kind": "imported",
+      "repository": "wilksu/dev-tool-images",
+      "image": "go-contract-tools",
+      "revision": null,
+      "release_tag": null,
+      "source_run_id": null,
+      "source": "ghcr.io/wilksu/dev-tool-images/go-contract-tools@sha256:ea884874ca2b1f8449e027e5e35fecd9a1a3f55d8faa276c4732205fbd339b29",
+      "target": "go-contract-tools:sha-ea884874ca2b",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "copy_mode": "exact",
+      "acr_digest": "sha256:ea884874ca2b1f8449e027e5e35fecd9a1a3f55d8faa276c4732205fbd339b29",
+      "acr_manifest": null
+    }
+  ]
+}

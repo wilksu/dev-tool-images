@@ -2,83 +2,70 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
-    paths-ignore:
-      - mirrors/**
-      - scripts/mirror_acr.py
-      - tests/test_mirror_acr.py
-      - .github/workflows/mirror-acr.yml
-      - README.md
+    branches: [master]
   pull_request:
-    branches:
-      - master
-    paths-ignore:
-      - mirrors/**
-      - scripts/mirror_acr.py
-      - tests/test_mirror_acr.py
-      - .github/workflows/mirror-acr.yml
-      - README.md
+    branches: [master]
   workflow_dispatch:
+    inputs:
+      images:
+        description: 'all or comma-separated owned image names (verification only)'
+        type: string
+        default: all
 
 permissions:
   contents: read
-
-env:
-  BUILDKIT_IMAGE: moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  catalog:
-    name: Machine contract
+  check:
+    name: Contracts, pipeline tests and change routing
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install schema validator on the hosted runner
-        run: python3 -m pip install --disable-pip-version-check --requirement requirements-ci.txt
-      - name: Validate catalog and image configurations
-        run: make check
-      - id: config
-        name: Resolve build matrix from catalog
-        run: python3 scripts/image_config.py ci-matrix
-    outputs:
-      matrix: ${{ steps.config.outputs.matrix }}
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check --requirement requirements-ci.txt
+      - run: make check
+      - id: plan
+        run: python3 scripts/change_plan.py
 
   build-and-verify:
-    name: ${{ matrix.image }} (${{ matrix.arch }})
-    needs: catalog
+    needs: check
+    if: needs.check.outputs.build == 'true'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image: ${{ matrix.image }}
+      platform: ${{ matrix.platform }}
+      runner: ${{ matrix.runner }}
+      revision: ${{ github.sha }}
+      release: false
+
+  result:
+    name: CI result
+    if: always()
+    needs: [check, build-and-verify]
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-        with:
-          driver-opts: |
-            image=${{ env.BUILDKIT_IMAGE }}
-      - id: config
-        name: Resolve authoritative build arguments
+      - name: Require contracts and all selected runtime checks
         env:
-          IMAGE: ${{ matrix.image }}
-        run: python3 scripts/image_config.py build-args "$IMAGE"
-      - name: Build native image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        with:
-          context: images/${{ matrix.image }}
-          file: images/${{ matrix.image }}/Dockerfile
-          platforms: ${{ matrix.platform }}
-          load: true
-          tags: dev-tool-images-ci/${{ matrix.image }}:${{ github.sha }}-${{ matrix.arch }}
-          build-args: ${{ steps.config.outputs.build_args }}
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
-      - name: Verify native runtime without network or privileges
-        env:
-          IMAGE: dev-tool-images-ci/${{ matrix.image }}:${{ github.sha }}-${{ matrix.arch }}
-        run: scripts/verify_image.sh "$IMAGE" "${{ matrix.fixture }}" "${{ matrix.platform }}"
+          CHECK: ${{ needs.check.result }}
+          BUILD: ${{ needs.build-and-verify.result }}
+          EXPECT_BUILD: ${{ needs.check.outputs.build }}
+        run: |
+          test "$CHECK" = success
+          if [ "$EXPECT_BUILD" = true ]; then
+            test "$BUILD" = success
+          else
+            test "$BUILD" = skipped
+          fi
