@@ -138,11 +138,13 @@ upstream build bases and delivery tools, and the published Go, Playwright and
 Android tool images. Local build stages, generated application images and
 placeholder references are excluded. Different configured versions remain
 separate entries; upstream registry proxies are normalized to their origin.
-MinIO is an explicit exception: its origin currently returns 401, so the list
-uses the DaoCloud cache after verifying the exact project-pinned index digest
-there. The cached amd64 manifest is readable, but the arm64 and ppc64le manifests
-currently return access errors. An incomplete cache is reported as a failed
-mirror; the workflow does not silently drop platforms or substitute a release.
+MinIO is an explicit exception: its original registries currently reject
+anonymous reads, so the list uses the community archive `ghcr.io/netvark/minio`
+([archive source](https://github.com/netvark/minio-docker-build#image-mirrors)).
+Its index digest and all three runtime manifests (amd64, arm64 and ppc64le)
+match the original project pin. The DaoCloud cache was incomplete and is no
+longer used. The workflow preserves the original digest and platforms rather
+than substituting another release or rebuilding it.
 
 Version policy: `@sha256:...` is authoritative even when a tag precedes it.
 Without a digest, an explicit version follows only that exact tag, never a
